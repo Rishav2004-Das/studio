@@ -29,7 +29,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <SidebarHeader className="p-4">
           <Link href="/" className="flex items-center gap-2">
             <Award className="h-8 w-8 text-sidebar-primary" />
-            <span className="text-2xl font-bold text-sidebar-foreground">Snaggy</span>
+            <span className="text-2xl font-bold text-sidebar-foreground">Telebounties</span>
           </Link>
         </SidebarHeader>
         <SidebarContent>

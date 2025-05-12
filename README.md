@@ -1,7 +1,7 @@
 
-# Firebase Studio - Snaggy App
+# Firebase Studio - Telebounties App
 
-This is a NextJS starter in Firebase Studio for the Snaggy application.
+This is a NextJS starter in Firebase Studio for the Telebounties application.
 
 ## Getting Started
 

@@ -20,7 +20,7 @@ export function AppHeader() {
           <SidebarTrigger className="md:hidden" />
           <Link href="/" className="flex items-center gap-2">
             <Award className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-bold text-foreground">Snaggy</h1>
+            <h1 className="text-xl font-bold text-foreground">Telebounties</h1>
           </Link>
         </div>
         <Skeleton className="h-9 w-9 rounded-full bg-muted" /> {/* Skeleton Avatar */}
@@ -34,7 +34,7 @@ export function AppHeader() {
         <SidebarTrigger className="md:hidden" />
         <Link href="/" className="flex items-center gap-2">
           <Award className="h-7 w-7 text-primary" />
-          <h1 className="text-xl font-bold text-foreground">Snaggy</h1>
+          <h1 className="text-xl font-bold text-foreground">Telebounties</h1>
         </Link>
       </div>
       <div className="flex items-center gap-4">

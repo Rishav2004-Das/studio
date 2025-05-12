@@ -3,8 +3,8 @@ import { mockTasks } from "@/lib/mock-data";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Available Tasks | Snaggy",
-  description: "Browse and complete tasks to earn tokens on Snaggy.",
+  title: "Available Tasks | Telebounties",
+  description: "Browse and complete tasks to earn tokens on Telebounties.",
 };
 
 export default function TasksPage() {

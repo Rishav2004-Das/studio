@@ -17,11 +17,11 @@ export async function generateMetadata({ params }: TaskDetailPageProps): Promise
   const task = getTaskById(params.id);
   if (!task) {
     return {
-      title: "Task Not Found | Snaggy"
+      title: "Task Not Found | Telebounties"
     }
   }
   return {
-    title: `${task.title} | Snaggy`,
+    title: `${task.title} | Telebounties`,
     description: task.description,
   };
 }

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Snaggy App",
+  title: "Telebounties App",
   description: "Complete tasks, earn tokens, and climb the leaderboard!",
 };
 
