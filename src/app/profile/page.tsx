@@ -1,47 +1,71 @@
-import { UserProfileCard } from "@/components/profile/user-profile-card";
-import { SubmissionHistoryItem } from "@/components/profile/submission-history-item";
-import { mockUser, getSubmissionsByUserId, getTaskById } from "@/lib/mock-data";
-import { Separator } from "@/components/ui/separator";
-import type { Metadata } from "next";
-import type { User } from "@/types";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { InfoIcon } from "lucide-react";
+'use client';
 
+import { useState } from 'react';
+import Link from 'next/link';
+import type { Metadata } from 'next'; // Keep for potential future static metadata
+import { UserProfileCard } from '@/components/profile/user-profile-card';
+import { SubmissionHistoryItem } from '@/components/profile/submission-history-item';
+import { LoginForm } from '@/components/auth/login-form';
+import { SignupForm } from '@/components/auth/signup-form';
+import { mockUser, getSubmissionsByUserId, getTaskById } from '@/lib/mock-data'; // Keep mock data for logged-in state
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import type { User } from '@/types';
 
-export const metadata: Metadata = {
-  title: "My Profile | Snaggy",
-  description: "View your Snaggy profile, token balance, and submission history.",
-};
+// Note: We'll manage auth state locally for now.
+// A real app would use context or a state management library.
 
-// Simulates fetching the current user. In a real app, this would involve auth.
-// Returns mockUser for now, so the profile will always be displayed.
-// To test the "not logged in" state, this function could be made to return null.
-function getCurrentUser(): User | null {
-  return mockUser;
-}
+// export const metadata: Metadata = {
+//   title: "My Profile | Snaggy", // Metadata can't be dynamic in 'use client' easily, handle dynamically if needed
+//   description: "View your Snaggy profile, token balance, and submission history, or log in/sign up.",
+// };
 
 export default function ProfilePage() {
-  const user = getCurrentUser();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showLogin, setShowLogin] = useState(true);
 
-  if (!user) {
+  // Function to simulate successful login/signup
+  const handleAuthSuccess = () => {
+    setIsAuthenticated(true);
+  };
+
+  // Placeholder for the logged-in user data
+  const user: User | null = isAuthenticated ? mockUser : null;
+
+  if (!isAuthenticated || !user) {
     return (
       <div className="container mx-auto flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center">
-        <Alert className="max-w-md shadow-md">
-          <InfoIcon className="h-5 w-5" />
-          <AlertTitle>Profile Unavailable</AlertTitle>
-          <AlertDescription>
-            You need to be logged in to view your profile and submission history.
-            <Button asChild className="mt-4 w-full sm:w-auto">
-              <Link href="/">Explore Tasks</Link>
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <Card className="w-full max-w-md shadow-xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">
+              {showLogin ? 'Welcome Back!' : 'Create Account'}
+            </CardTitle>
+            <CardDescription>
+              {showLogin
+                ? 'Log in to access your profile.'
+                : 'Sign up to start earning tokens.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {showLogin ? (
+              <LoginForm
+                onLoginSuccess={handleAuthSuccess}
+                switchToSignup={() => setShowLogin(false)}
+              />
+            ) : (
+              <SignupForm
+                onSignupSuccess={handleAuthSuccess}
+                switchToLogin={() => setShowLogin(true)}
+              />
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
+  // If authenticated, show the profile
   const submissions = getSubmissionsByUserId(user.id);
 
   return (
@@ -63,7 +87,7 @@ export default function ProfilePage() {
               <SubmissionHistoryItem
                 key={submission.id}
                 submission={submission}
-                taskTitle={task.title} // Pass only the task title
+                taskTitle={task.title}
               />
             );
           })}
