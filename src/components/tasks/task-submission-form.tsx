@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,8 +16,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import type { SerializableTask } from "@/types"; // Changed from Task to SerializableTask
-import { UploadCloud, Send } from "lucide-react";
+import type { SerializableTask } from "@/types"; 
+import { UploadCloud, Send, LogIn } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
 
 const submissionFormSchema = z.object({
   caption: z.string().min(10, {
@@ -24,17 +30,19 @@ const submissionFormSchema = z.object({
   }).max(500, {
     message: "Caption must not exceed 500 characters.",
   }),
-  file: z.any().optional(), // Making file optional for now, can be refined based on task requirements
+  file: z.any().optional(), 
 });
 
 type SubmissionFormValues = z.infer<typeof submissionFormSchema>;
 
 interface TaskSubmissionFormProps {
-  task: SerializableTask; // Changed from Task to SerializableTask
+  task: SerializableTask; 
 }
 
 export function TaskSubmissionForm({ task }: TaskSubmissionFormProps) {
   const { toast } = useToast();
+  const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
+
   const form = useForm<SubmissionFormValues>({
     resolver: zodResolver(submissionFormSchema),
     defaultValues: {
@@ -45,13 +53,50 @@ export function TaskSubmissionForm({ task }: TaskSubmissionFormProps) {
 
   function onSubmit(data: SubmissionFormValues) {
     // Simulate API call
-    console.log("Form submitted:", data);
+    console.log("Form submitted:", data, "by user:", currentUser?.id);
     toast({
       title: "Submission Successful!",
       description: `Your submission for "${task.title}" has been received.`,
-      variant: "default", // 'default' will use primary color, can also be 'destructive' or custom.
+      variant: "default", 
     });
     form.reset();
+  }
+
+  if (authLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-24" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Card className="border-primary/50 shadow-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl text-primary">
+            <LogIn className="h-5 w-5" />
+            Login Required
+          </CardTitle>
+          <CardDescription>
+            You need to be logged in to submit tasks.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Please log in or create an account to participate and earn tokens.
+          </p>
+          <Button asChild className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Link href="/profile">
+              <LogIn className="mr-2 h-4 w-4" /> Log In / Sign Up
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -75,7 +120,6 @@ export function TaskSubmissionForm({ task }: TaskSubmissionFormProps) {
           )}
         />
 
-        {/* Conditionally render file input based on task requirements if needed. For now, always show. */}
         <FormField
           control={form.control}
           name="file"
@@ -109,3 +153,4 @@ export function TaskSubmissionForm({ task }: TaskSubmissionFormProps) {
     </Form>
   );
 }
+
