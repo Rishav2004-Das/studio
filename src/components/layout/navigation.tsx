@@ -10,7 +10,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { LayoutGrid, UserCircle2, Trophy, Settings } from "lucide-react"; // Added Settings icon
+import { LayoutGrid, UserCircle2, Settings } from "lucide-react"; // Removed Trophy icon
 
 const navItems: NavItem[] = [
   {
@@ -24,14 +24,9 @@ const navItems: NavItem[] = [
     icon: UserCircle2,
   },
   {
-    title: "Leaderboard",
-    href: "/leaderboard",
-    icon: Trophy,
-  },
-  {
-    title: "Settings", // New Item
+    title: "Settings",
     href: "/settings",
-    icon: Settings,   // New Icon
+    icon: Settings,
   },
 ];
 

@@ -33,14 +33,6 @@ export interface Submission {
   tokensAwarded?: number;
 }
 
-export interface LeaderboardEntry {
-  rank: number;
-  userId: string; // Firebase UID
-  userName: string;
-  userAvatarUrl: string | null; 
-  totalTokens: number;
-}
-
 export interface NavItem {
   title: string;
   href: string;
@@ -48,3 +40,4 @@ export interface NavItem {
   label?: string;
   disabled?: boolean;
 }
+

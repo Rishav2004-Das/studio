@@ -1,5 +1,5 @@
 
-import type { Task, Submission, LeaderboardEntry } from "@/types";
+import type { Task, Submission } from "@/types"; // Removed LeaderboardEntry
 import { SmilePlus, MessageSquare, FileText, ListChecks, Video } from "lucide-react";
 // Firebase related user data (getUserById, updateUserAvatar, mockUser) will be handled by AuthContext and direct Firestore calls.
 
@@ -80,48 +80,6 @@ export const mockSubmissions: Submission[] = [
     status: "Pending",
   },
 ];
-
-// Leaderboard data can also remain mock for now.
-// In a real scenario, this would be generated from Firestore data.
-export const mockLeaderboard: LeaderboardEntry[] = [
-  {
-    rank: 1,
-    userId: "user001",
-    userName: "Sarah Miller",
-    userAvatarUrl: "https://picsum.photos/seed/sarah/80/80",
-    totalTokens: 250,
-  },
-  {
-    rank: 2,
-    userId: "user002",
-    userName: "John Doe",
-    userAvatarUrl: "https://picsum.photos/seed/john/80/80",
-    totalTokens: 180,
-  },
-  {
-    rank: 3,
-    userId: "user003_placeholder", // Placeholder
-    userName: "Alex Johnson (Mock)",
-    userAvatarUrl: null, 
-    totalTokens: 90, 
-  },
-  {
-    rank: 4,
-    userId: "user004",
-    userName: "Emily White",
-    userAvatarUrl: "https://picsum.photos/seed/emily/80/80",
-    totalTokens: 70,
-  },
-  {
-    rank: 5,
-    userId: "user005",
-    userName: "Michael Brown",
-    userAvatarUrl: "https://picsum.photos/seed/michael/80/80",
-    totalTokens: 50,
-  },
-].sort((a, b) => b.totalTokens - a.totalTokens)
- .map((entry, index) => ({ ...entry, rank: index + 1 }));
-
 
 // Helper function to get task by ID (simulating data fetching)
 export const getTaskById = (id: string): Task | undefined => {

@@ -49,5 +49,5 @@ This is a NextJS starter in Firebase Studio for the Snaggy application.
 - Task List: Display available tasks: Create Meme, Upload Tweet, Share Blog, Polls and Quizes, and create short videos
 - Task Submission: Display task details and submission form (file upload and caption).
 - User Profile: Display user profile with token balance and submission history.
-- Leaderboard: Display a leaderboard of top token earners.
 - Settings: Theme toggle, password update, logout, and account deletion.
+
