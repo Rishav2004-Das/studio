@@ -1,4 +1,6 @@
+
 import type { LucideIcon } from "lucide-react";
+import type { Settings } from 'lucide-react'; // Import specific icons if needed, or keep generic LucideIcon
 
 export interface Task {
   id: string;
@@ -41,7 +43,8 @@ export interface LeaderboardEntry {
 export interface NavItem {
   title: string;
   href: string;
-  icon: LucideIcon;
+  icon: LucideIcon; // Keep as LucideIcon to allow any lucide icon
   label?: string;
   disabled?: boolean;
 }
+

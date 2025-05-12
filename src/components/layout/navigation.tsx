@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -9,7 +10,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { LayoutGrid, UserCircle2, Trophy } from "lucide-react";
+import { LayoutGrid, UserCircle2, Trophy, Settings } from "lucide-react"; // Added Settings icon
 
 const navItems: NavItem[] = [
   {
@@ -26,6 +27,11 @@ const navItems: NavItem[] = [
     title: "Leaderboard",
     href: "/leaderboard",
     icon: Trophy,
+  },
+  {
+    title: "Settings", // New Item
+    href: "/settings",
+    icon: Settings,   // New Icon
   },
 ];
 
@@ -57,3 +63,4 @@ export function Navigation() {
     </SidebarMenu>
   );
 }
+
