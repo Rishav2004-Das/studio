@@ -41,14 +41,30 @@ export function LoginForm({ onLoginSuccess, switchToSignup }: LoginFormProps) {
   // Simulate login API call
   function onSubmit(data: LoginFormValues) {
     console.log('Login attempt:', data);
-    // In a real app, you would make an API call here
-    // For now, we simulate success
+    // In a real app, you would make an API call here and verify credentials
+    // For simulation, assume login is successful for the mock user
+    const mockUserId = "user123"; // Hardcoded for simulation
+
+    // Simulate successful login
     toast({
       title: 'Login Successful!',
       description: 'Welcome back!',
       variant: 'default',
     });
-    onLoginSuccess(); // Update parent component state
+
+    // --- Simulation for Header ---
+    // THIS IS NOT SECURE FOR REAL APPS. Use proper session management.
+    try {
+        localStorage.setItem('simulatedAuth', 'true');
+        localStorage.setItem('simulatedUserId', mockUserId);
+        // Dispatch a storage event so the header might update if listening
+        window.dispatchEvent(new Event('storage'));
+    } catch (e) {
+        console.error("Could not set localStorage for simulation:", e)
+    }
+    // ---------------------------
+
+    onLoginSuccess(); // Update parent component state (ProfilePage)
     form.reset();
   }
 

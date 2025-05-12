@@ -29,7 +29,7 @@ const signupFormSchema = z.object({
 type SignupFormValues = z.infer<typeof signupFormSchema>;
 
 interface SignupFormProps {
-  onSignupSuccess: () => void;
+  onSignupSuccess: () => void; // Typically redirects to login or auto-logs in
   switchToLogin: () => void;
 }
 
@@ -49,13 +49,32 @@ export function SignupForm({ onSignupSuccess, switchToLogin }: SignupFormProps) 
   function onSubmit(data: SignupFormValues) {
     console.log('Signup attempt:', { name: data.name, email: data.email }); // Don't log password
     // In a real app, you would make an API call here to create the user
-    // For now, we simulate success
+    // For now, we simulate success and assume the user needs to log in separately.
+    // If auto-login after signup is desired, you'd add the localStorage logic here too.
+
     toast({
       title: 'Signup Successful!',
-      description: `Welcome, ${data.name}! You can now log in.`,
+      description: `Welcome, ${data.name}! Please log in.`,
       variant: 'default',
     });
-    onSignupSuccess(); // Update parent component state (or redirect to login)
+
+    // // --- Optional: Simulate Auto-Login for Header ---
+    // // THIS IS NOT SECURE FOR REAL APPS. Use proper session management.
+    // const mockUserId = "user123"; // Assuming signup always creates this user in simulation
+    // try {
+    //     localStorage.setItem('simulatedAuth', 'true');
+    //     localStorage.setItem('simulatedUserId', mockUserId);
+    //     window.dispatchEvent(new Event('storage')); // Notify header
+    // } catch (e) {
+    //     console.error("Could not set localStorage for simulation:", e)
+    // }
+    // // ---------------------------------------------
+
+    // Depending on flow, either call onSignupSuccess (if it logs in)
+    // or switch to login view.
+    // onSignupSuccess();
+    switchToLogin(); // Switch to login form after successful signup
+
     form.reset();
   }
 
@@ -97,7 +116,7 @@ export function SignupForm({ onSignupSuccess, switchToLogin }: SignupFormProps) 
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="Create a password" {...field} />
+                <Input type="password" placeholder="Create a password (min 8 chars)" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

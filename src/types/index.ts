@@ -15,7 +15,7 @@ export type SerializableTask = Omit<Task, 'icon'>;
 export interface User {
   id: string;
   name: string;
-  avatarUrl: string;
+  avatarUrl: string | null; // Allow null for users without an avatar
   tokenBalance: number;
 }
 
@@ -34,7 +34,7 @@ export interface LeaderboardEntry {
   rank: number;
   userId: string;
   userName: string;
-  userAvatarUrl: string;
+  userAvatarUrl: string | null; // Allow null avatar for leaderboard entries as well
   totalTokens: number;
 }
 

@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { UserProfileCard } from '@/components/profile/user-profile-card';
 import { SubmissionHistoryItem } from '@/components/profile/submission-history-item';
 import { LoginForm } from '@/components/auth/login-form';
 import { SignupForm } from '@/components/auth/signup-form';
-import { getSubmissionsByUserId, getTaskById, getUserById } from '@/lib/mock-data';
+import { getSubmissionsByUserId, getTaskById, getUserById, updateUserAvatar } from '@/lib/mock-data';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { User, Submission } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 // Note: This component uses local state (`isAuthenticated`, `currentUser`) to simulate
 // authentication. A real application would typically use a dedicated auth provider/context
@@ -19,16 +20,26 @@ import { Skeleton } from '@/components/ui/skeleton';
 // Implementing a real database connection is beyond the scope of this simulation.
 
 export default function ProfilePage() {
+  const { toast } = useToast();
   // Simulate authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   // Simulate loading state while fetching user data
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start loading initially
   // Store the current user data once authenticated
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   // Store user's submissions
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   // Control whether to show Login or Signup form
   const [showLogin, setShowLogin] = useState(true);
+  // Ref for hidden file input
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Simulate checking auth status on mount
+  useEffect(() => {
+    // In a real app, check if the user is already logged in (e.g., from localStorage, session, auth context)
+    // For simulation, we assume not logged in initially.
+    setIsLoading(false); // Finished initial check
+  }, []);
 
   // Simulate fetching user data after successful authentication
   useEffect(() => {
@@ -46,6 +57,11 @@ export default function ProfilePage() {
         } else {
           // Handle case where user data couldn't be fetched (shouldn't happen with mock)
           console.error("Failed to fetch user data after login.");
+          toast({
+            title: "Error",
+            description: "Could not load user data. Please try logging in again.",
+            variant: "destructive",
+          });
           setIsAuthenticated(false); // Log out if data fetch fails
         }
         setIsLoading(false);
@@ -54,7 +70,7 @@ export default function ProfilePage() {
       setCurrentUser(null); // Clear user data on logout/initial state
       setSubmissions([]);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, toast]);
 
 
   // Function to call upon successful login/signup simulation
@@ -63,12 +79,58 @@ export default function ProfilePage() {
     // User data fetching is handled by the useEffect hook now
   };
 
+  // Function to simulate logout
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
+    });
+  };
+
+  // Trigger hidden file input when avatar is clicked
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle avatar file selection and update
+  const handleAvatarUpdate = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && currentUser) {
+      // Simulate upload and get URL (replace with actual upload logic)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newAvatarUrl = reader.result as string; // Use Data URL for simulation
+
+        // Update mock data (replace with backend call)
+        updateUserAvatar(currentUser.id, newAvatarUrl);
+
+        // Update local state immediately
+        setCurrentUser((prevUser) => {
+            if (!prevUser) return null;
+            return { ...prevUser, avatarUrl: newAvatarUrl };
+        });
+
+        toast({
+          title: "Avatar Updated",
+          description: "Your profile picture has been changed.",
+        });
+      };
+      reader.readAsDataURL(file); // Read file as Data URL for display simulation
+    }
+     // Reset file input value to allow re-uploading the same file
+     if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+  };
+
+
   // --- Render Logic ---
 
-  // 1. Show Loading Skeletons if authenticating/fetching data
+  // 1. Show Loading Skeletons if fetching data
   if (isLoading) {
     return (
-      <div className="container mx-auto">
+      <div className="container mx-auto animate-pulse">
         {/* Skeleton for UserProfileCard */}
         <Card className="shadow-lg">
           <CardHeader className="flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
@@ -118,10 +180,6 @@ export default function ProfilePage() {
                 switchToLogin={() => setShowLogin(true)}
               />
             )}
-            {/* DEVELOPMENT ONLY: Button to bypass login */}
-            {/* <Button onClick={handleAuthSuccess} variant="outline" className="mt-4 w-full">
-              [Dev] Simulate Login
-            </Button> */}
           </CardContent>
         </Card>
       </div>
@@ -132,8 +190,27 @@ export default function ProfilePage() {
   if (currentUser) {
     return (
       <div className="container mx-auto">
-        {/* Pass the fetched user data */}
-        <UserProfileCard user={currentUser} />
+         {/* Hidden file input for avatar upload */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleAvatarUpdate}
+          accept="image/*"
+          style={{ display: 'none' }}
+        />
+
+        {/* Pass the fetched user data and update handler */}
+        <UserProfileCard
+          user={currentUser}
+          onAvatarClick={handleAvatarClick}
+          isOwnProfile={true} // Assuming this page always shows the logged-in user's profile
+         />
+
+         {/* Logout Button */}
+         <div className="mt-4 text-center sm:text-right">
+            <Button variant="outline" onClick={handleLogout}>Logout</Button>
+         </div>
+
 
         <Separator className="my-8" />
 

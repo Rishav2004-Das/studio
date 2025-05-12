@@ -44,11 +44,11 @@ export const mockTasks: Task[] = [
   },
 ];
 
-// Mock user starts with 0 tokens. Tokens are earned via submissions.
+// Mock user starts with 0 tokens and no avatar.
 export const mockUser: User = {
   id: "user123",
   name: "Alex Johnson",
-  avatarUrl: "https://picsum.photos/seed/alex/100/100",
+  avatarUrl: null, // Initially no avatar photo
   tokenBalance: 0, // Initial token balance set to 0
 };
 
@@ -100,20 +100,20 @@ export const mockLeaderboard: LeaderboardEntry[] = [
     userId: "user001",
     userName: "Sarah Miller",
     userAvatarUrl: "https://picsum.photos/seed/sarah/80/80",
-    totalTokens: calculateTotalTokens("user001"), // Assuming Sarah has submissions elsewhere or starts > 0
+    totalTokens: calculateTotalTokens("user001") + 150, // Add some base value for variety
   },
   {
     rank: 2,
     userId: "user002",
     userName: "John Doe",
     userAvatarUrl: "https://picsum.photos/seed/john/80/80",
-    totalTokens: calculateTotalTokens("user002"), // Assuming John has submissions elsewhere or starts > 0
+    totalTokens: calculateTotalTokens("user002") + 100, // Add some base value for variety
   },
   {
     rank: 3,
     userId: "user123",
     userName: "Alex Johnson",
-    userAvatarUrl: "https://picsum.photos/seed/alex/80/80",
+    userAvatarUrl: mockUser.avatarUrl, // Use the current state from mockUser
     totalTokens: calculateTotalTokens("user123"), // Alex's tokens based on approved submissions
   },
   {
@@ -121,7 +121,7 @@ export const mockLeaderboard: LeaderboardEntry[] = [
     userId: "user004",
     userName: "Emily White",
     userAvatarUrl: "https://picsum.photos/seed/emily/80/80",
-    totalTokens: calculateTotalTokens("user004"),
+    totalTokens: calculateTotalTokens("user004") + 20, // Add some base value for variety
   },
   {
     rank: 5,
@@ -144,18 +144,33 @@ export const getSubmissionsByUserId = (userId: string): Submission[] => {
   return mockSubmissions.filter((sub) => sub.userId === userId);
 };
 
+// Simulate updating the mockUser's avatar (in a real app, this would update the database)
+export const updateUserAvatar = (userId: string, newAvatarUrl: string): void => {
+    if (userId === mockUser.id) {
+        mockUser.avatarUrl = newAvatarUrl;
+        // Also update the leaderboard entry if the user exists there
+        const leaderboardIndex = mockLeaderboard.findIndex(entry => entry.userId === userId);
+        if (leaderboardIndex !== -1) {
+            mockLeaderboard[leaderboardIndex].userAvatarUrl = newAvatarUrl;
+        }
+    }
+    // Handle other users if needed
+}
+
 // Helper function to get user by ID (needed for profile page logic)
 export const getUserById = (userId: string): User | undefined => {
   // In a real app, this would fetch from a database.
   // For simulation, return the mock user if IDs match.
   if (userId === mockUser.id) {
       // Return a copy with the calculated token balance based on submissions
+      // and the current avatar URL
       return {
           ...mockUser,
           tokenBalance: calculateTotalTokens(userId),
+          avatarUrl: mockUser.avatarUrl, // Ensure the current avatar is returned
       };
   }
-  // Add other mock users if needed for the leaderboard display or return undefined
+  // Find user in the leaderboard data (simulate fetching other users)
   const leaderboardUser = mockLeaderboard.find(entry => entry.userId === userId);
   if (leaderboardUser) {
     return {
