@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { ReactNode } from 'react';
@@ -59,11 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Display a global loading indicator while auth state is being determined
   if (isLoading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center">
-        <div className="space-y-4 p-4">
-            <Skeleton className="h-12 w-12 rounded-full" />
-            <Skeleton className="h-4 w-[250px]" />
-            <Skeleton className="h-4 w-[200px]" />
+      <div className="flex h-screen w-screen items-center justify-center p-4">
+        <div className="w-full max-w-xs space-y-4">
+            <Skeleton className="mx-auto h-12 w-12 rounded-full" />
+            <Skeleton className="h-4 w-full max-w-[250px] mx-auto" />
+            <Skeleton className="h-4 w-full max-w-[200px] mx-auto" />
         </div>
       </div>
     );
