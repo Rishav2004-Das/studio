@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTheme } from '@/hooks/use-theme'; // Use the imported hook
-import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
+import { useTheme } from '@/hooks/use-theme'; 
+import { Button, buttonVariants } from '@/components/ui/button'; 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -16,9 +16,12 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Sun, Moon, LogOut, Trash2, LockKeyhole } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import Link from 'next/link'; // Import Link
-
-// No static metadata for client components
+import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
+import { auth, db } from '@/lib/firebase/config';
+import { signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser as deleteFirebaseUser } from 'firebase/auth';
+import { doc, deleteDoc } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const updatePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: 'Current password is required.' }),
@@ -34,8 +37,12 @@ type UpdatePasswordFormValues = z.infer<typeof updatePasswordSchema>;
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const { firebaseUser, isAuthenticated, isLoading: authLoading } = useAuth();
+  const [pageLoading, setPageLoading] = useState(true);
+  const [isPasswordUpdateLoading, setIsPasswordUpdateLoading] = useState(false);
+  const [isDeleteAccountLoading, setIsDeleteAccountLoading] = useState(false);
+   const [isLogoutLoading, setIsLogoutLoading] = useState(false);
+
 
   const passwordForm = useForm<UpdatePasswordFormValues>({
     resolver: zodResolver(updatePasswordSchema),
@@ -47,67 +54,142 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    // Simulate checking auth status on mount
-    const authStatus = localStorage.getItem('simulatedAuth') === 'true';
-    setIsAuthenticated(authStatus);
-    setIsLoading(false);
+    if (!authLoading) {
+      setPageLoading(false);
+    }
+  }, [authLoading]);
 
-    // Listen for storage changes (login/logout events from other components)
-        const handleStorageChange = () => {
-            const updatedAuth = localStorage.getItem('simulatedAuth') === 'true';
-             setIsAuthenticated(updatedAuth);
-        };
-        window.addEventListener('storage', handleStorageChange);
-        return () => {
-          window.removeEventListener('storage', handleStorageChange);
-        };
-  }, []);
-
-  const handleLogout = () => {
-    // Simulate logout
-    localStorage.removeItem('simulatedAuth');
-    localStorage.removeItem('simulatedUserId');
-    setIsAuthenticated(false);
-    window.dispatchEvent(new Event('storage')); // Notify other components like header
-    toast({
-      title: 'Logged Out',
-      description: 'You have been successfully logged out.',
-    });
-    // Optionally redirect to home or login page
-    // window.location.href = '/';
+  const handleLogout = async () => {
+    setIsLogoutLoading(true);
+    try {
+      await signOut(auth);
+      toast({
+        title: 'Logged Out',
+        description: 'You have been successfully logged out.',
+      });
+      // AuthContext handles UI update
+    } catch (error) {
+      console.error("Error logging out: ", error);
+      toast({
+        title: 'Logout Failed',
+        description: 'An error occurred during logout.',
+        variant: 'destructive',
+      });
+    } finally {
+        setIsLogoutLoading(false);
+    }
   };
 
-  const handleDeleteAccount = () => {
-    // Simulate account deletion
-    localStorage.removeItem('simulatedAuth');
-    localStorage.removeItem('simulatedUserId');
-    setIsAuthenticated(false);
-    window.dispatchEvent(new Event('storage')); // Notify other components
-    toast({
-      title: 'Account Deleted',
-      description: 'Your account has been permanently deleted.',
-      variant: 'destructive',
-    });
-     // Optionally redirect
-    // window.location.href = '/';
+  const handleDeleteAccount = async () => {
+    if (!firebaseUser || !firebaseUser.email) {
+        toast({ title: "Error", description: "User not found or email missing for re-authentication.", variant: "destructive" });
+        return;
+    }
+    setIsDeleteAccountLoading(true);
+
+    const currentPassword = prompt("Please enter your current password to confirm account deletion:");
+    if (!currentPassword) {
+        toast({ title: "Cancelled", description: "Account deletion cancelled." });
+        setIsDeleteAccountLoading(false);
+        return;
+    }
+    
+    try {
+        const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword);
+        await reauthenticateWithCredential(firebaseUser, credential);
+
+        // Delete user data from Firestore
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        await deleteDoc(userDocRef);
+
+        // Delete user from Firebase Auth
+        await deleteFirebaseUser(firebaseUser);
+        
+        toast({
+            title: 'Account Deleted',
+            description: 'Your account has been permanently deleted.',
+        });
+        // AuthContext will handle UI update
+    } catch (error: any) {
+        console.error("Error deleting account: ", error);
+        let desc = "Could not delete your account. Please try again.";
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            desc = "Incorrect password. Account deletion failed.";
+        } else if (error.code === 'auth/requires-recent-login') {
+            desc = "This operation is sensitive and requires recent authentication. Please log out and log back in before trying again.";
+        }
+        toast({
+            title: 'Account Deletion Failed',
+            description: desc,
+            variant: 'destructive',
+        });
+    } finally {
+        setIsDeleteAccountLoading(false);
+    }
   };
 
-  const onPasswordUpdateSubmit = (data: UpdatePasswordFormValues) => {
-    // Simulate password update API call
-    console.log('Updating password for user:', localStorage.getItem('simulatedUserId'));
-    console.log('Current Password:', data.currentPassword); // In real app, verify this
-    console.log('New Password:', data.newPassword); // In real app, send this to backend
-
-    toast({
-      title: 'Password Updated',
-      description: 'Your password has been successfully changed.',
-    });
-    passwordForm.reset();
+  const onPasswordUpdateSubmit = async (data: UpdatePasswordFormValues) => {
+    if (!firebaseUser || !firebaseUser.email) {
+      toast({ title: 'Error', description: 'User not found.', variant: 'destructive' });
+      return;
+    }
+    setIsPasswordUpdateLoading(true);
+    try {
+      const credential = EmailAuthProvider.credential(firebaseUser.email, data.currentPassword);
+      await reauthenticateWithCredential(firebaseUser, credential);
+      await updatePassword(firebaseUser, data.newPassword);
+      toast({
+        title: 'Password Updated',
+        description: 'Your password has been successfully changed.',
+      });
+      passwordForm.reset();
+    } catch (error: any) {
+      console.error('Password update error:', error);
+       let desc = "Could not update your password. Please try again.";
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            desc = "Incorrect current password.";
+        } else if (error.code === 'auth/weak-password') {
+            desc = "The new password is too weak.";
+        } else if (error.code === 'auth/requires-recent-login') {
+             desc = "This operation is sensitive and requires recent authentication. Please log out and log back in before trying again.";
+        }
+      toast({
+        title: 'Password Update Failed',
+        description: desc,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPasswordUpdateLoading(false);
+    }
   };
 
-  if (isLoading) {
-    // Optional: Add loading skeletons if needed
-    return <div className="container mx-auto p-4">Loading settings...</div>;
+  if (pageLoading || authLoading) {
+    return (
+        <div className="container mx-auto space-y-8 p-4">
+            <Skeleton className="h-10 w-1/3 mb-8" />
+            <Card className="shadow-md">
+                <CardHeader>
+                    <Skeleton className="h-6 w-1/2 mb-2" />
+                    <Skeleton className="h-4 w-3/4" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-10 w-full" />
+                </CardContent>
+            </Card>
+             <Card className="shadow-md">
+                <CardHeader>
+                    <Skeleton className="h-6 w-1/2 mb-2" />
+                    <Skeleton className="h-4 w-3/4" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-10 w-full mb-4" />
+                     <Skeleton className="h-10 w-full mb-4" />
+                      <Skeleton className="h-10 w-full mb-4" />
+                    <Skeleton className="h-10 w-1/4" />
+                </CardContent>
+            </Card>
+        </div>
+    );
   }
 
   return (
@@ -116,7 +198,6 @@ export default function SettingsPage() {
         Settings
       </h1>
 
-      {/* Theme Settings Card - Always Visible */}
       <Card className="shadow-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl">
@@ -149,10 +230,8 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Account Settings Section - Visible Only When Logged In */}
       {isAuthenticated && (
         <>
-          {/* Update Password Card */}
           <Card className="shadow-md">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
@@ -171,7 +250,7 @@ export default function SettingsPage() {
                       <FormItem>
                         <FormLabel>Current Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="Enter your current password" {...field} />
+                          <Input type="password" placeholder="Enter your current password" {...field} disabled={isPasswordUpdateLoading} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -184,7 +263,7 @@ export default function SettingsPage() {
                       <FormItem>
                         <FormLabel>New Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="Enter new password (min 8 chars)" {...field} />
+                          <Input type="password" placeholder="Enter new password (min 8 chars)" {...field} disabled={isPasswordUpdateLoading} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -197,14 +276,14 @@ export default function SettingsPage() {
                       <FormItem>
                         <FormLabel>Confirm New Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="Confirm new password" {...field} />
+                          <Input type="password" placeholder="Confirm new password" {...field} disabled={isPasswordUpdateLoading}/>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                    Update Password
+                  <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isPasswordUpdateLoading}>
+                    {isPasswordUpdateLoading ? "Updating..." : "Update Password"}
                   </Button>
                 </form>
               </Form>
@@ -213,7 +292,6 @@ export default function SettingsPage() {
 
           <Separator />
 
-          {/* Account Actions Card */}
           <Card className="shadow-md border-destructive/50">
             <CardHeader>
               <CardTitle className="text-xl text-destructive">Account Actions</CardTitle>
@@ -225,8 +303,8 @@ export default function SettingsPage() {
                    <p className="font-medium">Log Out</p>
                    <p className="text-sm text-muted-foreground">End your current session.</p>
                  </div>
-                <Button variant="outline" onClick={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" /> Log Out
+                <Button variant="outline" onClick={handleLogout} disabled={isLogoutLoading}>
+                  {isLogoutLoading ? "Logging out..." : <><LogOut className="mr-2 h-4 w-4" /> Log Out</>}
                 </Button>
               </div>
               <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center justify-between rounded-lg border border-destructive p-4">
@@ -236,7 +314,7 @@ export default function SettingsPage() {
                  </div>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive">
+                    <Button variant="destructive" disabled={isDeleteAccountLoading}>
                       <Trash2 className="mr-2 h-4 w-4" /> Delete Account
                     </Button>
                   </AlertDialogTrigger>
@@ -245,14 +323,13 @@ export default function SettingsPage() {
                       <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                       <AlertDialogDescription>
                         This action cannot be undone. This will permanently delete your
-                        account and remove your data from our servers.
+                        account and remove your data. You will be asked for your current password.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      {/* Ensure buttonVariants is imported for this usage */}
-                      <AlertDialogAction onClick={handleDeleteAccount} className={buttonVariants({ variant: "destructive" })}>
-                        Yes, delete account
+                      <AlertDialogCancel disabled={isDeleteAccountLoading}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAccount} className={buttonVariants({ variant: "destructive" })} disabled={isDeleteAccountLoading}>
+                        {isDeleteAccountLoading ? "Deleting..." : "Yes, delete account"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -263,8 +340,7 @@ export default function SettingsPage() {
         </>
       )}
 
-       {/* Prompt to log in if not authenticated */}
-       {!isAuthenticated && !isLoading && (
+       {!isAuthenticated && !pageLoading && (
          <Card className="shadow-md">
             <CardHeader>
                 <CardTitle className="text-xl">Account Settings</CardTitle>
@@ -275,7 +351,6 @@ export default function SettingsPage() {
             </CardContent>
              <CardFooter>
                  <Button asChild variant="default">
-                    {/* Use Link component for navigation */}
                     <Link href="/profile">Log In / Sign Up</Link>
                  </Button>
             </CardFooter>
@@ -284,6 +359,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-// REMOVED the duplicate useTheme hook definition from here.
-// It should exist only in src/hooks/use-theme.ts

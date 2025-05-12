@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +16,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { UserPlus } from 'lucide-react';
+import { auth, db } from '@/lib/firebase/config';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import type { User as AppUser } from '@/types'; // Renamed User to AppUser
+import { useState } from 'react';
 
 const signupFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -23,18 +29,19 @@ const signupFormSchema = z.object({
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match.',
-  path: ['confirmPassword'], // Set error on confirmPassword field
+  path: ['confirmPassword'],
 });
 
 type SignupFormValues = z.infer<typeof signupFormSchema>;
 
 interface SignupFormProps {
-  onSignupSuccess: () => void; // Typically redirects to login or auto-logs in
+  onSignupSuccess: (userId: string) => void;
   switchToLogin: () => void;
 }
 
 export function SignupForm({ onSignupSuccess, switchToLogin }: SignupFormProps) {
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
     defaultValues: {
@@ -45,37 +52,53 @@ export function SignupForm({ onSignupSuccess, switchToLogin }: SignupFormProps) 
     },
   });
 
-  // Simulate signup API call
-  function onSubmit(data: SignupFormValues) {
-    console.log('Signup attempt:', { name: data.name, email: data.email }); // Don't log password
-    // In a real app, you would make an API call here to create the user
-    // For now, we simulate success and assume the user needs to log in separately.
-    // If auto-login after signup is desired, you'd add the localStorage logic here too.
+  async function onSubmit(data: SignupFormValues) {
+    setIsLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const firebaseUser = userCredential.user;
 
-    toast({
-      title: 'Signup Successful!',
-      description: `Welcome, ${data.name}! Please log in.`,
-      variant: 'default',
-    });
+      // Update Firebase Auth profile
+      await updateProfile(firebaseUser, { displayName: data.name });
 
-    // // --- Optional: Simulate Auto-Login for Header ---
-    // // THIS IS NOT SECURE FOR REAL APPS. Use proper session management.
-    // const mockUserId = "user123"; // Assuming signup always creates this user in simulation
-    // try {
-    //     localStorage.setItem('simulatedAuth', 'true');
-    //     localStorage.setItem('simulatedUserId', mockUserId);
-    //     window.dispatchEvent(new Event('storage')); // Notify header
-    // } catch (e) {
-    //     console.error("Could not set localStorage for simulation:", e)
-    // }
-    // // ---------------------------------------------
+      // Create user document in Firestore
+      const newUserDoc: AppUser = {
+        id: firebaseUser.uid,
+        name: data.name,
+        email: data.email,
+        avatarUrl: null,
+        tokenBalance: 0,
+        createdAt: serverTimestamp(),
+      };
+      await setDoc(doc(db, 'users', firebaseUser.uid), newUserDoc);
 
-    // Depending on flow, either call onSignupSuccess (if it logs in)
-    // or switch to login view.
-    // onSignupSuccess();
-    switchToLogin(); // Switch to login form after successful signup
+      toast({
+        title: 'Signup Successful!',
+        description: `Welcome, ${data.name}! Please log in.`,
+      });
+      
+      onSignupSuccess(firebaseUser.uid); // Notify parent, AuthContext will handle state
+      switchToLogin(); // Switch to login form after successful signup
+      form.reset();
 
-    form.reset();
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      let errorMessage = 'Signup failed. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please log in or use a different email.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'The password is too weak. Please choose a stronger password.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      }
+      toast({
+        title: 'Signup Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -88,7 +111,7 @@ export function SignupForm({ onSignupSuccess, switchToLogin }: SignupFormProps) 
             <FormItem>
               <FormLabel>Name</FormLabel>
               <FormControl>
-                <Input placeholder="Your Name" {...field} />
+                <Input placeholder="Your Name" {...field} disabled={isLoading}/>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -102,7 +125,7 @@ export function SignupForm({ onSignupSuccess, switchToLogin }: SignupFormProps) 
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="you@example.com" {...field} />
+                <Input placeholder="you@example.com" {...field} disabled={isLoading}/>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -116,7 +139,7 @@ export function SignupForm({ onSignupSuccess, switchToLogin }: SignupFormProps) 
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="Create a password (min 8 chars)" {...field} />
+                <Input type="password" placeholder="Create a password (min 8 chars)" {...field} disabled={isLoading}/>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -128,22 +151,22 @@ export function SignupForm({ onSignupSuccess, switchToLogin }: SignupFormProps) 
           name="confirmPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Confirm Password</FormLabel>
+              <FormLabel>Confirm New Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="Confirm your password" {...field} />
+                <Input type="password" placeholder="Confirm your password" {...field} disabled={isLoading}/>
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-          <UserPlus className="mr-2 h-4 w-4" /> Sign Up
+        <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading}>
+          {isLoading ? 'Signing Up...' : <><UserPlus className="mr-2 h-4 w-4" /> Sign Up</> }
         </Button>
 
         <div className="text-center text-sm text-muted-foreground">
           Already have an account?{' '}
-          <Button variant="link" type="button" onClick={switchToLogin} className="p-0 h-auto">
+          <Button variant="link" type="button" onClick={switchToLogin} className="p-0 h-auto" disabled={isLoading}>
             Log In
           </Button>
         </div>

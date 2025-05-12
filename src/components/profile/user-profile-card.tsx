@@ -1,29 +1,32 @@
+
 import type { User } from "@/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Award, UserCircle2, Camera } from "lucide-react";
+import { Award, UserCircle2, Camera, Loader2 } from "lucide-react"; // Added Loader2
 import { cn } from "@/lib/utils";
 
 interface UserProfileCardProps {
   user: User;
-  onAvatarClick?: () => void; // Optional callback for when avatar is clicked
-  isOwnProfile?: boolean; // Flag to indicate if this is the logged-in user's profile
+  onAvatarClick?: () => void; 
+  isOwnProfile?: boolean; 
+  isUpdatingAvatar?: boolean; // New prop
 }
 
-export function UserProfileCard({ user, onAvatarClick, isOwnProfile = false }: UserProfileCardProps) {
+export function UserProfileCard({ user, onAvatarClick, isOwnProfile = false, isUpdatingAvatar = false }: UserProfileCardProps) {
   const fallbackInitials = user.name?.split(' ').map(n => n[0]).join('').toUpperCase() || <UserCircle2 />;
 
   return (
     <Card className="shadow-lg">
       <CardHeader className="flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
-        <div className="relative">
+        <div className="relative group"> {/* Added group for hover effect on camera icon */}
           <Avatar
             className={cn(
               "h-24 w-24 border-4 border-primary sm:h-28 sm:w-28",
-              isOwnProfile && "cursor-pointer hover:opacity-80 transition-opacity"
+              isOwnProfile && !isUpdatingAvatar && "cursor-pointer hover:opacity-80 transition-opacity",
+              isUpdatingAvatar && "opacity-50" // Dim avatar during update
             )}
-            onClick={isOwnProfile ? onAvatarClick : undefined}
-            title={isOwnProfile ? "Click to change photo" : ""}
+            onClick={isOwnProfile && !isUpdatingAvatar ? onAvatarClick : undefined}
+            title={isOwnProfile && !isUpdatingAvatar ? "Click to change photo" : (isUpdatingAvatar ? "Updating..." : "")}
           >
             {user.avatarUrl ? (
               <AvatarImage src={user.avatarUrl} alt={user.name || 'User avatar'} data-ai-hint="user avatar" />
@@ -33,8 +36,12 @@ export function UserProfileCard({ user, onAvatarClick, isOwnProfile = false }: U
             </AvatarFallback>
           </Avatar>
           {isOwnProfile && (
-            <div className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-90 transition-opacity group-hover:opacity-100 pointer-events-none">
-              <Camera className="h-4 w-4" />
+            <div className={cn(
+                "absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity",
+                !isUpdatingAvatar && "opacity-70 group-hover:opacity-100",
+                isUpdatingAvatar ? "opacity-100" : "pointer-events-none group-hover:pointer-events-auto"
+              )}>
+              {isUpdatingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             </div>
           )}
         </div>
@@ -44,6 +51,9 @@ export function UserProfileCard({ user, onAvatarClick, isOwnProfile = false }: U
             <Award className="mr-2 h-6 w-6" />
             <span className="font-semibold">{user.tokenBalance.toLocaleString()} Tokens Earned</span>
           </CardDescription>
+          {user.email && (
+            <p className="mt-1 text-sm text-muted-foreground text-center sm:text-left">{user.email}</p>
+          )}
         </div>
       </CardHeader>
     </Card>

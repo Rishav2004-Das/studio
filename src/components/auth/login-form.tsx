@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +16,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { LogIn } from 'lucide-react';
+import { auth } from '@/lib/firebase/config';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useState } from 'react';
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address.' }),
@@ -24,12 +28,13 @@ const loginFormSchema = z.object({
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 interface LoginFormProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (userId: string) => void; // Pass userId back
   switchToSignup: () => void;
 }
 
 export function LoginForm({ onLoginSuccess, switchToSignup }: LoginFormProps) {
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
@@ -38,34 +43,32 @@ export function LoginForm({ onLoginSuccess, switchToSignup }: LoginFormProps) {
     },
   });
 
-  // Simulate login API call
-  function onSubmit(data: LoginFormValues) {
-    console.log('Login attempt:', data);
-    // In a real app, you would make an API call here and verify credentials
-    // For simulation, assume login is successful for the mock user
-    const mockUserId = "user123"; // Hardcoded for simulation
-
-    // Simulate successful login
-    toast({
-      title: 'Login Successful!',
-      description: 'Welcome back!',
-      variant: 'default',
-    });
-
-    // --- Simulation for Header ---
-    // THIS IS NOT SECURE FOR REAL APPS. Use proper session management.
+  async function onSubmit(data: LoginFormValues) {
+    setIsLoading(true);
     try {
-        localStorage.setItem('simulatedAuth', 'true');
-        localStorage.setItem('simulatedUserId', mockUserId);
-        // Dispatch a storage event so the header might update if listening
-        window.dispatchEvent(new Event('storage'));
-    } catch (e) {
-        console.error("Could not set localStorage for simulation:", e)
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      toast({
+        title: 'Login Successful!',
+        description: 'Welcome back!',
+      });
+      onLoginSuccess(userCredential.user.uid); // AuthContext will handle state update
+      form.reset();
+    } catch (error: any) {
+      console.error('Login error:', error);
+      let errorMessage = 'Login failed. Please check your credentials.';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errorMessage = 'Invalid email or password.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      }
+      toast({
+        title: 'Login Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
-    // ---------------------------
-
-    onLoginSuccess(); // Update parent component state (ProfilePage)
-    form.reset();
   }
 
   return (
@@ -78,7 +81,7 @@ export function LoginForm({ onLoginSuccess, switchToSignup }: LoginFormProps) {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="you@example.com" {...field} />
+                <Input placeholder="you@example.com" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -92,20 +95,20 @@ export function LoginForm({ onLoginSuccess, switchToSignup }: LoginFormProps) {
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" {...field} />
+                <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-          <LogIn className="mr-2 h-4 w-4" /> Log In
+        <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading}>
+          {isLoading ? 'Logging In...' : <><LogIn className="mr-2 h-4 w-4" /> Log In</>}
         </Button>
 
         <div className="text-center text-sm text-muted-foreground">
           Don't have an account?{' '}
-          <Button variant="link" type="button" onClick={switchToSignup} className="p-0 h-auto">
+          <Button variant="link" type="button" onClick={switchToSignup} className="p-0 h-auto" disabled={isLoading}>
             Sign Up
           </Button>
         </div>
