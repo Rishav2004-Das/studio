@@ -44,13 +44,16 @@ export const mockTasks: Task[] = [
   },
 ];
 
+// Mock user starts with 0 tokens. Tokens are earned via submissions.
 export const mockUser: User = {
   id: "user123",
   name: "Alex Johnson",
   avatarUrl: "https://picsum.photos/seed/alex/100/100",
-  tokenBalance: 1250,
+  tokenBalance: 0, // Initial token balance set to 0
 };
 
+// Note: The submissions below award tokens, which will increase the balance displayed
+// if the app logic were to sum them up. The header currently shows the static mockUser.tokenBalance.
 export const mockSubmissions: Submission[] = [
   {
     id: "sub1",
@@ -83,43 +86,53 @@ export const mockSubmissions: Submission[] = [
   },
 ];
 
+// Calculate total earned tokens for the leaderboard based on approved submissions
+const calculateTotalTokens = (userId: string): number => {
+  return mockSubmissions
+    .filter(sub => sub.userId === userId && sub.status === "Approved" && sub.tokensAwarded)
+    .reduce((sum, sub) => sum + (sub.tokensAwarded || 0), 0);
+};
+
+// Update leaderboard data based on calculated tokens
 export const mockLeaderboard: LeaderboardEntry[] = [
   {
     rank: 1,
     userId: "user001",
     userName: "Sarah Miller",
     userAvatarUrl: "https://picsum.photos/seed/sarah/80/80",
-    totalTokens: 2500,
+    totalTokens: calculateTotalTokens("user001"), // Assuming Sarah has submissions elsewhere or starts > 0
   },
   {
     rank: 2,
     userId: "user002",
     userName: "John Doe",
     userAvatarUrl: "https://picsum.photos/seed/john/80/80",
-    totalTokens: 2200,
+    totalTokens: calculateTotalTokens("user002"), // Assuming John has submissions elsewhere or starts > 0
   },
   {
     rank: 3,
     userId: "user123",
     userName: "Alex Johnson",
     userAvatarUrl: "https://picsum.photos/seed/alex/80/80",
-    totalTokens: 1250,
+    totalTokens: calculateTotalTokens("user123"), // Alex's tokens based on approved submissions
   },
   {
     rank: 4,
     userId: "user004",
     userName: "Emily White",
     userAvatarUrl: "https://picsum.photos/seed/emily/80/80",
-    totalTokens: 1100,
+    totalTokens: calculateTotalTokens("user004"),
   },
   {
     rank: 5,
     userId: "user005",
     userName: "Michael Brown",
     userAvatarUrl: "https://picsum.photos/seed/michael/80/80",
-    totalTokens: 950,
+    totalTokens: calculateTotalTokens("user005"),
   },
-];
+].sort((a, b) => b.totalTokens - a.totalTokens) // Sort by tokens desc
+ .map((entry, index) => ({ ...entry, rank: index + 1 })); // Recalculate rank based on sorting
+
 
 // Helper function to get task by ID (simulating data fetching)
 export const getTaskById = (id: string): Task | undefined => {
@@ -130,3 +143,27 @@ export const getTaskById = (id: string): Task | undefined => {
 export const getSubmissionsByUserId = (userId: string): Submission[] => {
   return mockSubmissions.filter((sub) => sub.userId === userId);
 };
+
+// Helper function to get user by ID (needed for profile page logic)
+export const getUserById = (userId: string): User | undefined => {
+  // In a real app, this would fetch from a database.
+  // For simulation, return the mock user if IDs match.
+  if (userId === mockUser.id) {
+      // Return a copy with the calculated token balance based on submissions
+      return {
+          ...mockUser,
+          tokenBalance: calculateTotalTokens(userId),
+      };
+  }
+  // Add other mock users if needed for the leaderboard display or return undefined
+  const leaderboardUser = mockLeaderboard.find(entry => entry.userId === userId);
+  if (leaderboardUser) {
+    return {
+      id: leaderboardUser.userId,
+      name: leaderboardUser.userName,
+      avatarUrl: leaderboardUser.userAvatarUrl,
+      tokenBalance: leaderboardUser.totalTokens,
+    }
+  }
+  return undefined;
+}
