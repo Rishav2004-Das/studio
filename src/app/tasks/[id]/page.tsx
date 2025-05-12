@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import type { Task } from "@/types"; // Task type is still used for getTaskById and metadata
 
 interface TaskDetailPageProps {
   params: { id: string };
@@ -39,6 +40,10 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   }
 
   const IconComponent = task.icon;
+
+  // Destructure the task object to separate the non-serializable 'icon'
+  // from the rest of the details that will be passed to the client component.
+  const { icon, ...serializableTaskDetails } = task;
 
   return (
     <div className="container mx-auto">
@@ -87,7 +92,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               <CardDescription>Complete the form below to submit your task.</CardDescription>
             </CardHeader>
             <CardContent>
-              <TaskSubmissionForm task={task} />
+              <TaskSubmissionForm task={serializableTaskDetails} />
             </CardContent>
           </Card>
         </div>

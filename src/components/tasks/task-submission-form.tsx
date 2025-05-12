@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import type { Task } from "@/types";
+import type { SerializableTask } from "@/types"; // Changed from Task to SerializableTask
 import { UploadCloud, Send } from "lucide-react";
 
 const submissionFormSchema = z.object({
@@ -30,7 +30,7 @@ const submissionFormSchema = z.object({
 type SubmissionFormValues = z.infer<typeof submissionFormSchema>;
 
 interface TaskSubmissionFormProps {
-  task: Task;
+  task: SerializableTask; // Changed from Task to SerializableTask
 }
 
 export function TaskSubmissionForm({ task }: TaskSubmissionFormProps) {

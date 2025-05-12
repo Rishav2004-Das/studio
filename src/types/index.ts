@@ -9,6 +9,9 @@ export interface Task {
   category: string; // e.g., "Content Creation", "Social Media"
 }
 
+// Serializable version of Task, without the non-serializable 'icon' property
+export type SerializableTask = Omit<Task, 'icon'>;
+
 export interface User {
   id: string;
   name: string;
