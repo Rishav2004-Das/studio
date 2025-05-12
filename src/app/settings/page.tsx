@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTheme } from '@/hooks/use-theme'; // We'll create this hook
-import { Button } from '@/components/ui/button';
+import { useTheme } from '@/hooks/use-theme'; // Use the imported hook
+import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -16,13 +16,9 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Sun, Moon, LogOut, Trash2, LockKeyhole } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import type { Metadata } from 'next';
+import Link from 'next/link'; // Import Link
 
 // No static metadata for client components
-// export const metadata: Metadata = {
-//   title: "Settings | Snaggy",
-//   description: "Manage your Snaggy account settings and preferences.",
-// };
 
 const updatePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: 'Current password is required.' }),
@@ -254,6 +250,7 @@ export default function SettingsPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      {/* Ensure buttonVariants is imported for this usage */}
                       <AlertDialogAction onClick={handleDeleteAccount} className={buttonVariants({ variant: "destructive" })}>
                         Yes, delete account
                       </AlertDialogAction>
@@ -278,6 +275,7 @@ export default function SettingsPage() {
             </CardContent>
              <CardFooter>
                  <Button asChild variant="default">
+                    {/* Use Link component for navigation */}
                     <Link href="/profile">Log In / Sign Up</Link>
                  </Button>
             </CardFooter>
@@ -287,52 +285,5 @@ export default function SettingsPage() {
   );
 }
 
-// Helper hook for theme management (to keep page component cleaner)
-// This would ideally be in its own file (e.g., src/hooks/use-theme.ts)
-// But placing here for brevity in this response.
-import { createContext, useContext, useMemo } from 'react';
-import Link from 'next/link';
-import { buttonVariants } from '@/components/ui/button';
-
-type Theme = 'light' | 'dark' | 'system';
-
-type ThemeProviderState = {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-};
-
-const initialState: ThemeProviderState = {
-  theme: 'system',
-  setTheme: () => null,
-};
-
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
-
-// You would wrap your layout with ThemeProvider in a real app
-// export function ThemeProvider({ children, ... }: ...)
-
-// Simple hook implementation using localStorage and CSS class toggling
-export function useTheme() {
-  const [theme, _setTheme] = useState<Theme>(() => {
-    if (typeof window === 'undefined') {
-      return 'light'; // Default for SSR
-    }
-    return (localStorage.getItem('theme') as Theme) || 'light'; // Default to light if nothing set
-  });
-
-   useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
-  }, [theme]);
-
-  const setTheme = (newTheme: Theme) => {
-     if (typeof window !== 'undefined') {
-         localStorage.setItem('theme', newTheme);
-     }
-    _setTheme(newTheme);
-  };
-
-
-  return { theme, setTheme };
-}
+// REMOVED the duplicate useTheme hook definition from here.
+// It should exist only in src/hooks/use-theme.ts
