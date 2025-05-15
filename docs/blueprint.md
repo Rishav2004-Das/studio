@@ -1,4 +1,4 @@
-# **App Name**: Snaggy
+# **App Name**: Telebounties
 
 ## Core Features:
 
