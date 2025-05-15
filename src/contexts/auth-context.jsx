@@ -4,8 +4,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase/config';
-import { Skeleton } from '@/components/ui/skeleton'; 
+import { auth, db } from '@/lib/firebase/config.js';
+import { Skeleton } from '@/components/ui/skeleton.jsx'; 
 
 
 const AuthContext = createContext(undefined);

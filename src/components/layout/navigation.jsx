@@ -3,12 +3,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.js";
 import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/sidebar.jsx";
 import { LayoutGrid, UserCircle2, Settings } from "lucide-react"; 
 
 const navItems = [

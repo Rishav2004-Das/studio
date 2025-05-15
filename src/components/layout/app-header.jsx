@@ -2,12 +2,12 @@
 'use client'; 
 
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button.jsx";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar.jsx";
+import { SidebarTrigger } from "@/components/ui/sidebar.jsx";
 import { Award, UserCircle2, LogIn } from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/auth-context.jsx";
+import { Skeleton } from "@/components/ui/skeleton.jsx";
 
 
 export function AppHeader() {
