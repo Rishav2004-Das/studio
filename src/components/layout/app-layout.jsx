@@ -7,12 +7,12 @@ import {
   SidebarFooter,
   SidebarInset,
   SidebarRail,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/sidebar.jsx";
 import { Award } from "lucide-react";
 import Link from "next/link";
-import { AppHeader } from "./app-header";
-import { Navigation } from "./navigation";
-import { Toaster } from "@/components/ui/toaster";
+import { AppHeader } from "./app-header.jsx";
+import { Navigation } from "./navigation.jsx";
+import { Toaster } from "@/components/ui/toaster.jsx";
 
 
 export function AppLayout({ children }) {
