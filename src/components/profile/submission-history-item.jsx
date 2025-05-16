@@ -2,7 +2,7 @@
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Award, CalendarDays, FileText, CheckCircle, XCircle, Clock } from "lucide-react";
-import Image from "next/image";
+import Image from "next/legacy/image";
 
 
 const statusIcons = {
