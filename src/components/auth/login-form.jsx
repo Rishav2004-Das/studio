@@ -4,7 +4,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button.jsx';
 import {
   Form,
   FormControl,
@@ -12,11 +12,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+} from '@/components/ui/form.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { useToast } from '@/hooks/use-toast.js';
 import { LogIn } from 'lucide-react';
-import { auth } from '@/lib/firebase/config';
+import { auth } from '@/lib/firebase/config.js';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useState } from 'react';
 
@@ -48,13 +48,19 @@ export function LoginForm({ onLoginSuccess, switchToSignup }) {
       onLoginSuccess(userCredential.user.uid); // AuthContext will handle state update
       form.reset();
     } catch (error) {
-      console.error('Login error:', error);
       let errorMessage = 'Login failed. Please check your credentials.';
+      // Check for specific Firebase error codes
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         errorMessage = 'Invalid email or password.';
+        // Don't log this expected error to the console
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Please enter a valid email address.';
+        // Don't log this expected error to the console
+      } else {
+        // Log other unexpected errors
+        console.error('Login error:', error);
       }
+      
       toast({
         title: 'Login Failed',
         description: errorMessage,
