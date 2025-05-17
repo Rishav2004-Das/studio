@@ -53,7 +53,8 @@ export default function AdminReviewPage() {
     setIsLoading(true);
     try {
       const submissionsCol = collection(db, 'submissions');
-      // This query requires a composite index on 'status' (asc/desc) and 'submittedAt' (desc)
+      // This admin query requires a composite index on 'status' (asc/desc) and 'submittedAt' (desc)
+      // This is different from the index (userId, submittedAt) used for user profiles.
       const q = query(submissionsCol, where('status', '==', status), orderBy('submittedAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
@@ -71,18 +72,18 @@ export default function AdminReviewPage() {
       let description = `Could not load ${status.toLowerCase()} submissions.`;
 
       if (error.code === 'failed-precondition') {
-        description += ` This often means a required Firestore index is missing. Please check your browser's developer console (usually under the "Console" or "Network" tab) for a message from Firebase with a link to create the index. The link will look like 'https://console.firebase.google.com/project/your-project-id/firestore/indexes?create_composite=...'`;
+        description += ` This often means a required Firestore index is missing for the admin query (filtering by 'status' and ordering by 'submittedAt'). Please check your browser's developer console (usually under the "Console" or "Network" tab) for a message from Firebase with a specific link to create this new index. It will look like 'https://console.firebase.google.com/project/your-project-id/firestore/indexes?create_composite=...'`;
       } else if (error.code === 'permission-denied') {
-        description += ` Permission denied. Please ensure your Firestore security rules allow admin users to list submissions based on status and order them by submission date. Also, verify the logged-in user has 'isAdmin: true' in their Firestore 'users' document. It's also possible this 'permission-denied' error is masking a missing Firestore index; check the browser's developer console for any index creation links from Firebase.`;
+        description += ` Permission denied. Ensure your Firestore security rules allow admin users to list submissions based on status and order them by submission date. Also, verify the logged-in user has 'isAdmin: true' in their Firestore 'users' document. It's also possible this 'permission-denied' error is masking a missing Firestore index for the admin query (on 'status' and 'submittedAt'); check the browser's developer console for any index creation links from Firebase.`;
       } else {
-        description += ` ${error.message || 'An unknown error occurred.'} Check the browser's developer console for more details, including potential links to create Firestore indexes.`;
+        description += ` ${error.message || 'An unknown error occurred.'} Check the browser's developer console for more details, including potential links to create Firestore indexes for the admin query (on 'status' and 'submittedAt').`;
       }
       
       toast({
         title: title,
         description: description,
         variant: 'destructive',
-        duration: 15000, // Increased duration for more complex message
+        duration: 20000, // Increased duration for more complex message
       });
     } finally {
       setIsLoading(false);
