@@ -118,13 +118,15 @@ export default function SettingsPage() {
         setPasswordForDelete(''); 
         // AuthContext will handle UI update
     } catch (error) {
-        console.error("Error deleting account: ", error);
         let desc = "Could not delete your account. Please try again.";
         if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
             desc = "Incorrect password. Account deletion failed.";
             setPasswordForDelete(''); // Clear password if it was wrong
         } else if (error.code === 'auth/requires-recent-login') {
             desc = "This operation is sensitive and requires recent authentication. Please log out and log back in before trying again.";
+        } else {
+            // Log only unexpected errors
+            console.error("Error deleting account: ", error);
         }
         toast({
             title: 'Account Deletion Failed',
@@ -152,7 +154,6 @@ export default function SettingsPage() {
       });
       passwordForm.reset();
     } catch (error) {
-      console.error('Password update error:', error);
        let desc = "Could not update your password. Please try again.";
         if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
             desc = "Incorrect current password.";
@@ -160,6 +161,8 @@ export default function SettingsPage() {
             desc = "The new password is too weak.";
         } else if (error.code === 'auth/requires-recent-login') {
              desc = "This operation is sensitive and requires recent authentication. Please log out and log back in before trying again.";
+        } else {
+            console.error('Password update error:', error);
         }
       toast({
         title: 'Password Update Failed',
@@ -298,7 +301,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Separator />
+          <Separator className="my-8" />
 
           <Card className="shadow-md border-destructive/50">
             <CardHeader>
