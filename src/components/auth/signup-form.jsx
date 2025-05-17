@@ -75,19 +75,25 @@ export function SignupForm({ onSignupSuccess, switchToLogin }) {
       form.reset();
 
     } catch (error) {
-      console.error('Signup error:', error);
       let errorMessage = 'Signup failed. Please try again.';
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'This email is already registered. Please log in or use a different email.';
-        // Switch to login form if email is already in use
+        // This is an expected error, so we don't need to log it as a critical console error.
+        // The toast and form switch are sufficient handling.
         if (switchToLogin) {
             switchToLogin();
         }
       } else if (error.code === 'auth/weak-password') {
         errorMessage = 'The password is too weak. Please choose a stronger password.';
+        console.error('Signup error (weak-password):', error);
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Please enter a valid email address.';
+        console.error('Signup error (invalid-email):', error);
+      } else {
+        // Log other unexpected errors
+        console.error('Signup error:', error);
       }
+      
       toast({
         title: 'Signup Failed',
         description: errorMessage,
