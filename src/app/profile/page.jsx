@@ -104,43 +104,53 @@ export default function ProfilePage() {
     if (file && localCurrentUser && firebaseUser) {
       setIsUpdatingAvatar(true);
       toast({ title: 'Uploading Avatar...', description: 'Please wait.' });
+      console.log('[handleAvatarUpdate] Starting avatar upload. File:', file.name, 'Size:', file.size);
       try {
-        console.log('Starting avatar upload...');
+        console.log('[handleAvatarUpdate] Entered try block.');
+        
         const storageRef = ref(storage, `avatars/${firebaseUser.uid}/${file.name}`);
-        console.log('Uploading to Firebase Storage...');
+        console.log('[handleAvatarUpdate] Attempting to upload to Firebase Storage...');
         await uploadBytes(storageRef, file);
-        console.log('Upload complete. Getting download URL...');
-        const newAvatarUrl = await getDownloadURL(storageRef);
-        console.log('Download URL obtained. Updating Firestore document...');
+        console.log('[handleAvatarUpdate] Firebase Storage upload COMPLETE.');
 
+        console.log('[handleAvatarUpdate] Attempting to get download URL...');
+        const newAvatarUrl = await getDownloadURL(storageRef);
+        console.log('[handleAvatarUpdate] Download URL obtained:', newAvatarUrl);
+
+        console.log('[handleAvatarUpdate] Attempting to update Firestore document...');
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         await updateDoc(userDocRef, { avatarUrl: newAvatarUrl });
-        console.log('Firestore document updated.');
+        console.log('[handleAvatarUpdate] Firestore document update COMPLETE.');
 
         setLocalCurrentUser((prevUser) => {
           if (!prevUser) return null;
-          return { ...prevUser, avatarUrl: newAvatarUrl };
+          const updatedUser = { ...prevUser, avatarUrl: newAvatarUrl };
+          console.log('[handleAvatarUpdate] localCurrentUser state updated with new avatarUrl.');
+          return updatedUser;
         });
         
         toast({
           title: 'Avatar Updated',
           description: 'Your profile picture has been changed.',
         });
+        console.log('[handleAvatarUpdate] Avatar update successful, success toast shown.');
       } catch (error) {
-        console.error('Error updating avatar:', error);
-        console.error('Firebase error code:', error.code);
-        console.error('Firebase error message:', error.message);
+        console.error('[handleAvatarUpdate] Error during avatar update process:', error);
+        console.error('[handleAvatarUpdate] Firebase error code (if available):', error.code);
+        console.error('[handleAvatarUpdate] Firebase error message (if available):', error.message);
         toast({
           title: 'Avatar Update Failed',
           description: `Could not update your avatar. ${error.message || 'Please try again.'}`,
           variant: 'destructive',
         });
       } finally {
-        console.log('Avatar update process finished. Resetting loading state.');
+        console.log('[handleAvatarUpdate] Entered finally block.');
         setIsUpdatingAvatar(false);
+        console.log('[handleAvatarUpdate] setIsUpdatingAvatar(false) CALLED.');
         if (fileInputRef.current) {
-          fileInputRef.current.value = ''; // Reset file input
+          fileInputRef.current.value = ''; 
         }
+        console.log('[handleAvatarUpdate] Exiting finally block.');
       }
     }
   };
