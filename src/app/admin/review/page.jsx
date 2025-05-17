@@ -65,12 +65,19 @@ export default function AdminReviewPage() {
       });
       setSubmissions(fetchedSubmissions);
     } catch (error) {
-      console.error(`Error fetching ${status} submissions (full error object): `, error); // Log the full error object
-      console.error(`Error code: ${error.code}, Error message: ${error.message}`); // Log code and message specifically
+      console.error(`Error fetching ${status} submissions (full error object): `, error);
+      console.error(`Error code: ${error.code}, Error message: ${error.message}`);
+      let description = `Could not load ${status.toLowerCase()} submissions. ${error.message || 'Missing or insufficient permissions.'}`;
+      if (error.message && error.message.toLowerCase().includes("index")) {
+        description += " Check the browser's developer console (Network or Console tab) for a link to create the required Firestore index.";
+      } else {
+        description += " Please check Firestore security rules and ensure the logged-in user has admin privileges and the necessary permissions to list submissions.";
+      }
       toast({
         title: 'Error Fetching Submissions',
-        description: `Could not load ${status.toLowerCase()} submissions. ${error.message || 'Missing or insufficient permissions.'}`,
+        description: description,
         variant: 'destructive',
+        duration: 9000, // Give more time to read
       });
     } finally {
       setIsLoading(false);
@@ -299,3 +306,4 @@ export default function AdminReviewPage() {
     </div>
   );
 }
+
