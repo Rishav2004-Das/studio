@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.jsx";
 import {
   Form,
   FormControl,
@@ -12,15 +12,19 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+} from "@/components/ui/form.jsx";
+import { Input } from "@/components/ui/input.jsx";
+import { Textarea } from "@/components/ui/textarea.jsx";
+import { useToast } from "@/hooks/use-toast.js";
 import { UploadCloud, Send, LogIn } from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context.jsx";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.jsx";
+import { Skeleton } from "@/components/ui/skeleton.jsx";
+import { useState } from "react";
+import { db, storage } from '@/lib/firebase/config.js';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 
 const submissionFormSchema = z.object({
@@ -29,13 +33,15 @@ const submissionFormSchema = z.object({
   }).max(500, {
     message: "Caption must not exceed 500 characters.",
   }),
-  file: z.any().optional(), 
+  file: z.any().optional(),
 });
 
 
 export function TaskSubmissionForm({ task }) {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fileToUpload, setFileToUpload] = useState(null);
 
   const form = useForm({
     resolver: zodResolver(submissionFormSchema),
@@ -45,16 +51,69 @@ export function TaskSubmissionForm({ task }) {
     },
   });
 
-  function onSubmit(data) {
-    // Simulate API call
-    console.log("Form submitted:", data, "by user:", currentUser?.id);
-    toast({
-      title: "Submission Successful!",
-      description: `Your submission for "${task.title}" has been received.`,
-      variant: "default", 
-    });
-    form.reset();
+  async function onSubmit(data) {
+    if (!currentUser || !currentUser.id) {
+      toast({ title: "Error", description: "User not found. Please log in.", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    let fileUrl = null;
+
+    try {
+      if (fileToUpload) {
+        toast({ title: "Uploading file...", description: "Please wait." });
+        const fileRef = ref(storage, `submissions/${currentUser.id}/${task.id}/${fileToUpload.name}`);
+        await uploadBytes(fileRef, fileToUpload);
+        fileUrl = await getDownloadURL(fileRef);
+        toast({ title: "File Uploaded", description: "Your file has been uploaded successfully." });
+      }
+
+      const submissionData = {
+        userId: currentUser.id,
+        taskId: task.id,
+        taskTitle: task.title,
+        caption: data.caption,
+        fileUrl: fileUrl,
+        submittedAt: serverTimestamp(),
+        status: "Pending",
+        tokensAwarded: 0,
+      };
+
+      await addDoc(collection(db, "submissions"), submissionData);
+
+      toast({
+        title: "Submission Successful!",
+        description: `Your submission for "${task.title}" has been received.`,
+        variant: "default",
+      });
+      form.reset();
+      setFileToUpload(null);
+      if (document.getElementById('file-input')) {
+        document.getElementById('file-input').value = '';
+      }
+    } catch (error) {
+      console.error("Submission error:", error);
+      toast({
+        title: "Submission Failed",
+        description: "Could not submit your task. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setFileToUpload(file);
+      form.setValue("file", file); // Update RHF state if needed for validation, though direct use of fileToUpload is primary
+    } else {
+      setFileToUpload(null);
+      form.setValue("file", undefined);
+    }
+  };
+
 
   if (authLoading) {
     return (
@@ -107,6 +166,7 @@ export function TaskSubmissionForm({ task }) {
                   placeholder="Provide details about your submission, links, or any relevant information."
                   className="min-h-[120px] resize-y"
                   {...field}
+                  disabled={isSubmitting}
                 />
               </FormControl>
               <FormMessage />
@@ -117,21 +177,23 @@ export function TaskSubmissionForm({ task }) {
         <FormField
           control={form.control}
           name="file"
-          render={({ field }) => (
+          render={({ field }) => ( // field is kept for RHF validation if needed, but onChange is handled by handleFileChange
             <FormItem>
               <FormLabel>Upload File (Optional)</FormLabel>
               <FormControl>
                 <div className="flex items-center space-x-2">
                   <UploadCloud className="h-5 w-5 text-muted-foreground" />
                   <Input
+                    id="file-input"
                     type="file"
-                    onChange={(e) => field.onChange(e.target.files ? e.target.files[0] : null)}
+                    onChange={handleFileChange} // Use custom handler
                     className="block w-full text-sm text-slate-500
                       file:mr-4 file:py-2 file:px-4
                       file:rounded-full file:border-0
                       file:text-sm file:font-semibold
                       file:bg-primary/10 file:text-primary
                       hover:file:bg-primary/20"
+                    disabled={isSubmitting}
                   />
                 </div>
               </FormControl>
@@ -140,8 +202,8 @@ export function TaskSubmissionForm({ task }) {
           )}
         />
 
-        <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
-          <Send className="mr-2 h-4 w-4" /> Submit Task
+        <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
+          {isSubmitting ? "Submitting..." : <><Send className="mr-2 h-4 w-4" /> Submit Task</>}
         </Button>
       </form>
     </Form>

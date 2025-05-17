@@ -3,20 +3,20 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { UserProfileCard } from '@/components/profile/user-profile-card';
-import { SubmissionHistoryItem } from '@/components/profile/submission-history-item';
-import { LoginForm } from '@/components/auth/login-form';
-import { SignupForm } from '@/components/auth/signup-form';
-import { getSubmissionsByUserId, getTaskById } from '@/lib/mock-data'; 
-import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/auth-context';
-import { auth, db, storage } from '@/lib/firebase/config';
+import { UserProfileCard } from '@/components/profile/user-profile-card.jsx';
+import { SubmissionHistoryItem } from '@/components/profile/submission-history-item.jsx';
+import { LoginForm } from '@/components/auth/login-form.jsx';
+import { SignupForm } from '@/components/auth/signup-form.jsx';
+// Removed getSubmissionsByUserId and getTaskById from mock-data as we fetch from Firestore
+import { Separator } from '@/components/ui/separator.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
+import { Skeleton } from '@/components/ui/skeleton.jsx';
+import { useToast } from '@/hooks/use-toast.js';
+import { useAuth } from '@/contexts/auth-context.jsx';
+import { auth, db, storage } from '@/lib/firebase/config.js';
 import { signOut } from 'firebase/auth';
-import { doc, updateDoc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function ProfilePage() {
@@ -34,25 +34,50 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!authLoading) {
       setPageLoading(false);
-      if (currentUser) {
+      if (currentUser && currentUser.id) {
         setLocalCurrentUser(currentUser);
-        // Fetch submissions (still mock for now)
-        const userSubmissions = getSubmissionsByUserId(currentUser.id);
-        setSubmissions(userSubmissions);
+        const fetchSubmissions = async () => {
+          try {
+            const submissionsCol = collection(db, 'submissions');
+            const q = query(
+              submissionsCol,
+              where('userId', '==', currentUser.id),
+              orderBy('submittedAt', 'desc')
+            );
+            const querySnapshot = await getDocs(q);
+            const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
+              const data = docSnapshot.data();
+              return {
+                id: docSnapshot.id,
+                ...data,
+                submittedAt: data.submittedAt?.toDate ? data.submittedAt.toDate() : new Date(data.submittedAt || Date.now())
+              };
+            });
+            setSubmissions(fetchedSubmissions);
+          } catch (error) {
+            console.error("Error fetching submissions: ", error);
+            toast({
+              title: 'Error Fetching History',
+              description: 'Could not load your submission history.',
+              variant: 'destructive',
+            });
+            setSubmissions([]);
+          }
+        };
+        fetchSubmissions();
       } else {
         setLocalCurrentUser(null);
         setSubmissions([]);
       }
     }
-  }, [authLoading, currentUser]);
+  }, [authLoading, currentUser, toast]); // Added toast to dependencies
 
   const handleAuthSuccess = async (userId) => {
-    // This function might not be directly needed if AuthProvider handles user fetching
-    // However, we can re-fetch user data here if needed or rely on AuthContext update
     const userDocRef = doc(db, 'users', userId);
     const userDocSnap = await getDoc(userDocRef);
     if (userDocSnap.exists()) {
-      setLocalCurrentUser(userDocSnap.data());
+      // This will trigger the useEffect above due to currentUser changing in AuthContext
+      // setLocalCurrentUser(userDocSnap.data()); 
     }
   };
 
@@ -63,7 +88,6 @@ export default function ProfilePage() {
         title: 'Logged Out',
         description: 'You have been successfully logged out.',
       });
-      // AuthContext will handle clearing currentUser
     } catch (error) {
       console.error("Error logging out: ", error);
       toast({
@@ -97,6 +121,8 @@ export default function ProfilePage() {
           if (!prevUser) return null;
           return { ...prevUser, avatarUrl: newAvatarUrl };
         });
+        // AuthContext will eventually update from Firestore listener if one is set up for user doc,
+        // or a page refresh will show it. For immediate UI update, local state is fine.
 
         toast({
           title: 'Avatar Updated',
@@ -201,17 +227,13 @@ export default function ProfilePage() {
       </h2>
       {submissions.length > 0 ? (
         <div className="space-y-6">
-          {submissions.map((submission) => {
-            const task = getTaskById(submission.taskId);
-            if (!task) return null;
-            return (
-              <SubmissionHistoryItem
-                key={submission.id}
-                submission={submission}
-                taskTitle={task.title}
-              />
-            );
-          })}
+          {submissions.map((submission) => (
+            <SubmissionHistoryItem
+              key={submission.id}
+              submission={submission}
+              taskTitle={submission.taskTitle || "Task details unavailable"}
+            />
+          ))}
         </div>
       ) : (
         <div className="text-center rounded-lg border border-dashed p-8">
