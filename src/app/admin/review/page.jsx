@@ -53,6 +53,7 @@ export default function AdminReviewPage() {
     setIsLoading(true);
     try {
       const submissionsCol = collection(db, 'submissions');
+      // This query requires a composite index on 'status' (asc/desc) and 'submittedAt' (desc)
       const q = query(submissionsCol, where('status', '==', status), orderBy('submittedAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
@@ -66,18 +67,22 @@ export default function AdminReviewPage() {
       setSubmissions(fetchedSubmissions);
     } catch (error) {
       console.error(`Error fetching ${status} submissions (full error object): `, error);
-      console.error(`Error code: ${error.code}, Error message: ${error.message}`);
-      let description = `Could not load ${status.toLowerCase()} submissions. ${error.message || 'Missing or insufficient permissions.'}`;
-      if (error.message && error.message.toLowerCase().includes("index")) {
-        description += " Check the browser's developer console (Network or Console tab) for a link to create the required Firestore index.";
+      let title = 'Error Fetching Submissions';
+      let description = `Could not load ${status.toLowerCase()} submissions.`;
+
+      if (error.code === 'failed-precondition') {
+        description += ` This often means a required Firestore index is missing. Please check your browser's developer console (usually under the "Console" or "Network" tab) for a message from Firebase with a link to create the index. The link will look like 'https://console.firebase.google.com/project/your-project-id/firestore/indexes?create_composite=...'`;
+      } else if (error.code === 'permission-denied') {
+        description += ` Permission denied. Please ensure your Firestore security rules allow admin users to list submissions based on status and order them by submission date. Also, verify the logged-in user has 'isAdmin: true' in their Firestore 'users' document.`;
       } else {
-        description += " Please check Firestore security rules and ensure the logged-in user has admin privileges and the necessary permissions to list submissions.";
+        description += ` ${error.message || 'An unknown error occurred.'}`;
       }
+      
       toast({
-        title: 'Error Fetching Submissions',
+        title: title,
         description: description,
         variant: 'destructive',
-        duration: 9000, // Give more time to read
+        duration: 12000, // Increased duration for more complex message
       });
     } finally {
       setIsLoading(false);
@@ -110,14 +115,12 @@ export default function AdminReviewPage() {
         const submissionRef = doc(db, 'submissions', selectedSubmission.id);
         const userRef = doc(db, 'users', selectedSubmission.userId);
 
-        // 1. Update submission document
         transaction.update(submissionRef, {
           status: 'Approved',
           tokensAwarded: Number(tokensToAward),
           reviewedAt: serverTimestamp(),
         });
 
-        // 2. Increment user's tokenBalance
         transaction.update(userRef, {
           tokenBalance: increment(Number(tokensToAward)),
         });
@@ -130,7 +133,7 @@ export default function AdminReviewPage() {
       setIsApproveDialogOpen(false);
       setSelectedSubmission(null);
       setTokensToAward(0);
-      fetchSubmissions(activeTab); // Refresh list
+      fetchSubmissions(activeTab); 
     } catch (error) {
       console.error("Error approving submission: ", error);
       toast({
@@ -159,7 +162,7 @@ export default function AdminReviewPage() {
       });
       setIsRejectDialogOpen(false);
       setSelectedSubmission(null);
-      fetchSubmissions(activeTab); // Refresh list
+      fetchSubmissions(activeTab); 
     } catch (error) {
       console.error("Error rejecting submission: ", error);
       toast({
@@ -257,7 +260,6 @@ export default function AdminReviewPage() {
         </div>
       )}
 
-      {/* Approve Dialog */}
       <AlertDialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -286,7 +288,6 @@ export default function AdminReviewPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reject Dialog */}
       <AlertDialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -306,4 +307,3 @@ export default function AdminReviewPage() {
     </div>
   );
 }
-
