@@ -37,7 +37,7 @@ const submissionFormSchema = z.object({
 });
 
 
-export function TaskSubmissionForm({ taskId, taskTitle }) {
+export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) { // Added taskTokens
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,13 +70,15 @@ export function TaskSubmissionForm({ taskId, taskTitle }) {
 
       const submissionData = {
         userId: currentUser.id,
+        submitterName: currentUser.name || "Unknown User", // Store submitter's name
         taskId: taskId,
         taskTitle: taskTitle,
+        originalTaskTokens: taskTokens || 0, // Store original tokens for the task
         caption: data.caption,
         fileUrl: fileUrl,
         submittedAt: serverTimestamp(),
-        status: "Pending",
-        tokensAwarded: 0,
+        status: "Pending", // Default status
+        tokensAwarded: 0, // Default, to be updated by admin
       };
 
       await addDoc(collection(db, "submissions"), submissionData);
@@ -107,7 +109,7 @@ export function TaskSubmissionForm({ taskId, taskTitle }) {
     const file = event.target.files?.[0];
     if (file) {
       setFileToUpload(file);
-      form.setValue("file", file); // Update RHF state if needed for validation, though direct use of fileToUpload is primary
+      form.setValue("file", file); 
     } else {
       setFileToUpload(null);
       form.setValue("file", undefined);
@@ -177,7 +179,7 @@ export function TaskSubmissionForm({ taskId, taskTitle }) {
         <FormField
           control={form.control}
           name="file"
-          render={({ field }) => ( // field is kept for RHF validation if needed, but onChange is handled by handleFileChange
+          render={({ field }) => ( 
             <FormItem>
               <FormLabel>Upload File (Optional)</FormLabel>
               <FormControl>
@@ -186,7 +188,7 @@ export function TaskSubmissionForm({ taskId, taskTitle }) {
                   <Input
                     id="file-input"
                     type="file"
-                    onChange={handleFileChange} // Use custom handler
+                    onChange={handleFileChange} 
                     className="block w-full text-sm text-slate-500
                       file:mr-4 file:py-2 file:px-4
                       file:rounded-full file:border-0

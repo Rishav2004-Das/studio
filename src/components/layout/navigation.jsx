@@ -9,7 +9,8 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar.jsx";
-import { LayoutGrid, UserCircle2, Settings } from "lucide-react"; 
+import { LayoutGrid, UserCircle2, Settings, ShieldCheck } from "lucide-react"; 
+import { useAuth } from "@/contexts/auth-context.jsx";
 
 const navItems = [
   {
@@ -29,12 +30,26 @@ const navItems = [
   },
 ];
 
+const adminNavItems = [
+  {
+    title: "Admin Review",
+    href: "/admin/review",
+    icon: ShieldCheck,
+  }
+];
+
 export function Navigation() {
   const pathname = usePathname();
+  const { currentUser } = useAuth();
+
+  const itemsToDisplay = [...navItems];
+  if (currentUser && currentUser.isAdmin) {
+    itemsToDisplay.push(...adminNavItems);
+  }
 
   return (
     <SidebarMenu>
-      {navItems.map((item) => (
+      {itemsToDisplay.map((item) => (
         <SidebarMenuItem key={item.title}>
           <Link href={item.href} legacyBehavior passHref>
             <SidebarMenuButton

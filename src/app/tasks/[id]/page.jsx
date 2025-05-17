@@ -84,7 +84,7 @@ export default function TaskDetailPage({ params }) {
               <CardDescription>Complete the form below to submit your task.</CardDescription>
             </CardHeader>
             <CardContent>
-              <TaskSubmissionForm taskId={task.id} taskTitle={task.title} />
+              <TaskSubmissionForm taskId={task.id} taskTitle={task.title} taskTokens={task.tokens} />
             </CardContent>
           </Card>
         </div>
