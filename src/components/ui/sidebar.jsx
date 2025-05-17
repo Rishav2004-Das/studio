@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils.js"
 import { Button } from "@/components/ui/button.jsx"
 import { Input } from "@/components/ui/input.jsx"
 import { Separator } from "@/components/ui/separator.jsx"
-import { Sheet, SheetContent } from "@/components/ui/sheet.jsx"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet.jsx"
 import { Skeleton } from "@/components/ui/skeleton.jsx"
 import {
   Tooltip,
@@ -177,6 +177,16 @@ const Sidebar = React.forwardRef(
     }
 
     if (isMobile) {
+      // Find SidebarHeader, SidebarContent, SidebarFooter to place them correctly
+      const header = React.Children.toArray(children).find(child => child.type === SidebarHeader);
+      const content = React.Children.toArray(children).find(child => child.type === SidebarContent);
+      const footer = React.Children.toArray(children).find(child => child.type === SidebarFooter);
+      // Other children that are not header, content, or footer
+      const otherChildren = React.Children.toArray(children).filter(
+        child => child.type !== SidebarHeader && child.type !== SidebarContent && child.type !== SidebarFooter
+      );
+
+
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
           <SheetContent
@@ -187,11 +197,23 @@ const Sidebar = React.forwardRef(
                 "bg-sidebar", 
                 "p-0", 
                 "text-sidebar-foreground", 
-                "[&>button]:hidden" 
+                "[&>button]:hidden", // Hide default close button if custom is preferred inside header
+                "flex flex-col" // Ensure flex column layout for SheetContent
             )}
             side={side}
           >
-            <div className="flex h-full w-full flex-col">{children}</div>
+             {/* You can add a generic title/description or use the existing SidebarHeader */}
+            {header ? React.cloneElement(header, { className: cn(header.props.className, "pt-6") }) : (
+              <SheetHeader className="p-4 pt-6">
+                <SheetTitle>Menu</SheetTitle>
+                <SheetDescription>
+                  Navigate through the application.
+                </SheetDescription>
+              </SheetHeader>
+            )}
+            {content}
+            {otherChildren} 
+            {footer}
           </SheetContent>
         </Sheet>
       )
@@ -371,6 +393,7 @@ const SidebarContent = React.forwardRef(
       data-sidebar="content"
       className={cn(
         "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+        "p-2", // Added padding to content as header/footer have it
         className
       )}
       {...props}
@@ -684,3 +707,5 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
+    
