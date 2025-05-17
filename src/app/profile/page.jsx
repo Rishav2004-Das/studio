@@ -111,7 +111,7 @@ export default function ProfilePage() {
         const storageRef = ref(storage, `avatars/${firebaseUser.uid}/${file.name}`);
         console.log('[handleAvatarUpdate] Attempting to upload to Firebase Storage...');
         await uploadBytes(storageRef, file);
-        console.log('[handleAvatarUpdate] Firebase Storage upload COMPLETE.');
+        console.log('[handleAvatarUpdate] Firebase Storage upload COMPLETE.'); // This log is key
 
         console.log('[handleAvatarUpdate] Attempting to get download URL...');
         const newAvatarUrl = await getDownloadURL(storageRef);
