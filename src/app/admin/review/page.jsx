@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase/config.js';
-import { collection, query, where, getDocs, doc, updateDoc, runTransaction, orderBy, Timestamp, increment } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, runTransaction, orderBy, Timestamp, increment, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast.js';
 import { Button } from '@/components/ui/button.jsx';
 import {
@@ -65,10 +65,11 @@ export default function AdminReviewPage() {
       });
       setSubmissions(fetchedSubmissions);
     } catch (error) {
-      console.error(`Error fetching ${status} submissions: `, error);
+      console.error(`Error fetching ${status} submissions (full error object): `, error); // Log the full error object
+      console.error(`Error code: ${error.code}, Error message: ${error.message}`); // Log code and message specifically
       toast({
         title: 'Error Fetching Submissions',
-        description: `Could not load ${status.toLowerCase()} submissions. ${error.message}`,
+        description: `Could not load ${status.toLowerCase()} submissions. ${error.message || 'Missing or insufficient permissions.'}`,
         variant: 'destructive',
       });
     } finally {
@@ -121,6 +122,7 @@ export default function AdminReviewPage() {
       });
       setIsApproveDialogOpen(false);
       setSelectedSubmission(null);
+      setTokensToAward(0);
       fetchSubmissions(activeTab); // Refresh list
     } catch (error) {
       console.error("Error approving submission: ", error);
@@ -171,7 +173,7 @@ export default function AdminReviewPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList>
           {Object.keys(statusConfig).map(status => (
-            <TabsTrigger key={status} value={status}>
+            <TabsTrigger key={status} value={status} className="gap-2">
               {statusConfig[status].icon} {status}
             </TabsTrigger>
           ))}
@@ -230,10 +232,10 @@ export default function AdminReviewPage() {
                   <TableCell className="text-center">
                     {submission.status === 'Pending' && (
                       <div className="flex gap-2 justify-center">
-                        <Button size="sm" variant="outline" className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleApproveClick(submission)}>
+                        <Button size="sm" variant="outline" className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleApproveClick(submission)} disabled={isProcessing}>
                           Approve
                         </Button>
-                        <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(submission)}>
+                        <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(submission)} disabled={isProcessing}>
                           Reject
                         </Button>
                       </div>
@@ -255,7 +257,7 @@ export default function AdminReviewPage() {
             <AlertDialogTitle>Approve Submission?</AlertDialogTitle>
             <AlertDialogDescription>
               Confirm approval for &quot;{selectedSubmission?.taskTitle}&quot; by {selectedSubmission?.submitterName}.
-              Enter the number of tokens to award.
+              Enter the number of tokens to award. Original task tokens: {selectedSubmission?.originalTaskTokens || 0}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-2">
@@ -269,7 +271,7 @@ export default function AdminReviewPage() {
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isProcessing} onClick={() => {setSelectedSubmission(null); setTokensToAward(0);}}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={processApproval} disabled={isProcessing} className="bg-green-600 hover:bg-green-700">
               {isProcessing ? 'Processing...' : 'Approve & Award'}
             </AlertDialogAction>
@@ -287,7 +289,7 @@ export default function AdminReviewPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isProcessing} onClick={() => setSelectedSubmission(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={processRejection} disabled={isProcessing} className="bg-red-600 hover:bg-red-700">
               {isProcessing ? 'Processing...' : 'Confirm Reject'}
             </AlertDialogAction>
