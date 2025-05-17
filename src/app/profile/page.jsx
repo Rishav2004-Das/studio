@@ -7,7 +7,6 @@ import { UserProfileCard } from '@/components/profile/user-profile-card.jsx';
 import { SubmissionHistoryItem } from '@/components/profile/submission-history-item.jsx';
 import { LoginForm } from '@/components/auth/login-form.jsx';
 import { SignupForm } from '@/components/auth/signup-form.jsx';
-// Removed getSubmissionsByUserId and getTaskById from mock-data as we fetch from Firestore
 import { Separator } from '@/components/ui/separator.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
@@ -70,15 +69,11 @@ export default function ProfilePage() {
         setSubmissions([]);
       }
     }
-  }, [authLoading, currentUser, toast]); // Added toast to dependencies
+  }, [authLoading, currentUser, toast]);
 
   const handleAuthSuccess = async (userId) => {
-    const userDocRef = doc(db, 'users', userId);
-    const userDocSnap = await getDoc(userDocRef);
-    if (userDocSnap.exists()) {
-      // This will trigger the useEffect above due to currentUser changing in AuthContext
-      // setLocalCurrentUser(userDocSnap.data()); 
-    }
+    // AuthContext will update currentUser, which triggers the useEffect above
+    // to fetch user data and submissions.
   };
 
   const handleLogout = async () => {
@@ -110,37 +105,43 @@ export default function ProfilePage() {
       setIsUpdatingAvatar(true);
       toast({ title: 'Uploading Avatar...', description: 'Please wait.' });
       try {
+        console.log('Starting avatar upload...');
         const storageRef = ref(storage, `avatars/${firebaseUser.uid}/${file.name}`);
+        console.log('Uploading to Firebase Storage...');
         await uploadBytes(storageRef, file);
+        console.log('Upload complete. Getting download URL...');
         const newAvatarUrl = await getDownloadURL(storageRef);
+        console.log('Download URL obtained. Updating Firestore document...');
 
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         await updateDoc(userDocRef, { avatarUrl: newAvatarUrl });
+        console.log('Firestore document updated.');
 
         setLocalCurrentUser((prevUser) => {
           if (!prevUser) return null;
           return { ...prevUser, avatarUrl: newAvatarUrl };
         });
-        // AuthContext will eventually update from Firestore listener if one is set up for user doc,
-        // or a page refresh will show it. For immediate UI update, local state is fine.
-
+        
         toast({
           title: 'Avatar Updated',
           description: 'Your profile picture has been changed.',
         });
       } catch (error) {
         console.error('Error updating avatar:', error);
+        console.error('Firebase error code:', error.code);
+        console.error('Firebase error message:', error.message);
         toast({
           title: 'Avatar Update Failed',
-          description: 'Could not update your avatar. Please try again.',
+          description: `Could not update your avatar. ${error.message || 'Please try again.'}`,
           variant: 'destructive',
         });
       } finally {
+        console.log('Avatar update process finished. Resetting loading state.');
         setIsUpdatingAvatar(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''; // Reset file input
+        }
       }
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
   };
 
