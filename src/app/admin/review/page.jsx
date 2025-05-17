@@ -115,10 +115,6 @@ export default function AdminReviewPage() {
         const submissionRef = doc(db, 'submissions', selectedSubmission.id);
         const userRef = doc(db, 'users', selectedSubmission.userId);
 
-        // It's good practice to read the user document within the transaction if you base logic on its current state,
-        // but for a simple increment, it might not be strictly necessary if rules prevent negative balances.
-        // For this example, we'll proceed directly with the increment.
-
         transaction.update(submissionRef, {
           status: 'Approved',
           tokensAwarded: Number(tokensToAward),
@@ -310,5 +306,4 @@ export default function AdminReviewPage() {
       </AlertDialog>
     </div>
   );
-
-    
+}
