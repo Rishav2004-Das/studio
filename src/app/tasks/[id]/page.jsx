@@ -1,10 +1,11 @@
-import { getTaskById, mockTasks } from "@/lib/mock-data";
+
+import { getTaskById, mockTasks, getIconComponent } from "@/lib/mock-data.js";
 import { notFound } from "next/navigation";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { TaskSubmissionForm } from "@/components/tasks/task-submission-form";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card.jsx";
+import { TaskSubmissionForm } from "@/components/tasks/task-submission-form.jsx";
 import { Award } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.jsx";
 import { ArrowLeft } from "lucide-react";
 
 
@@ -34,11 +35,11 @@ export default function TaskDetailPage({ params }) {
     notFound();
   }
 
-  const IconComponent = task.icon;
+  const IconComponent = getIconComponent(task.icon); // Get icon component using helper
 
-  // Destructure the task object to separate the non-serializable 'icon'
-  // from the rest of the details that will be passed to the client component.
-  const { icon, ...serializableTaskDetails } = task;
+  // The task object passed to TaskSubmissionForm will now have task.icon as a string,
+  // which is serializable.
+  const serializableTaskDetails = { ...task }; // The whole task object is now serializable
 
   return (
     <div className="container mx-auto">
@@ -57,7 +58,7 @@ export default function TaskDetailPage({ params }) {
             <CardHeader className="bg-muted/30 p-6">
               <div className="flex items-start gap-4">
                 <div className="mt-1 rounded-lg bg-primary/10 p-3 text-primary">
-                  <IconComponent className="h-10 w-10" />
+                  {IconComponent && <IconComponent className="h-10 w-10" />}
                 </div>
                 <div>
                   <CardTitle className="text-3xl font-bold">{task.title}</CardTitle>

@@ -1,11 +1,13 @@
+
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card.jsx";
+import { Button } from "@/components/ui/button.jsx";
 import { Award, ArrowRight } from "lucide-react";
+import { getIconComponent } from "@/lib/mock-data.js";
 
 
 export function TaskCard({ task }) {
-  const IconComponent = task.icon;
+  const IconComponent = getIconComponent(task.icon); // Get the icon component using the helper
   return (
     <Card className="flex h-full flex-col overflow-hidden shadow-lg transition-shadow hover:shadow-xl">
       <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-2">
