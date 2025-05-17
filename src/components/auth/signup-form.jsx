@@ -4,7 +4,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button.jsx';
 import {
   Form,
   FormControl,
@@ -12,11 +12,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+} from '@/components/ui/form.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { useToast } from '@/hooks/use-toast.js';
 import { UserPlus } from 'lucide-react';
-import { auth, db } from '@/lib/firebase/config';
+import { auth, db } from '@/lib/firebase/config.js';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useState } from 'react';
@@ -79,6 +79,10 @@ export function SignupForm({ onSignupSuccess, switchToLogin }) {
       let errorMessage = 'Signup failed. Please try again.';
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'This email is already registered. Please log in or use a different email.';
+        // Switch to login form if email is already in use
+        if (switchToLogin) {
+            switchToLogin();
+        }
       } else if (error.code === 'auth/weak-password') {
         errorMessage = 'The password is too weak. Please choose a stronger password.';
       } else if (error.code === 'auth/invalid-email') {
