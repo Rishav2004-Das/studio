@@ -35,11 +35,7 @@ export default function TaskDetailPage({ params }) {
     notFound();
   }
 
-  const IconComponent = getIconComponent(task.icon); // Get icon component using helper
-
-  // The task object passed to TaskSubmissionForm will now have task.icon as a string,
-  // which is serializable.
-  const serializableTaskDetails = { ...task }; // The whole task object is now serializable
+  const IconComponent = getIconComponent(task.icon);
 
   return (
     <div className="container mx-auto">
@@ -88,7 +84,7 @@ export default function TaskDetailPage({ params }) {
               <CardDescription>Complete the form below to submit your task.</CardDescription>
             </CardHeader>
             <CardContent>
-              <TaskSubmissionForm task={serializableTaskDetails} />
+              <TaskSubmissionForm taskId={task.id} taskTitle={task.title} />
             </CardContent>
           </Card>
         </div>

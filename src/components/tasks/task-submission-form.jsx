@@ -37,7 +37,7 @@ const submissionFormSchema = z.object({
 });
 
 
-export function TaskSubmissionForm({ task }) {
+export function TaskSubmissionForm({ taskId, taskTitle }) {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,7 +62,7 @@ export function TaskSubmissionForm({ task }) {
     try {
       if (fileToUpload) {
         toast({ title: "Uploading file...", description: "Please wait." });
-        const fileRef = ref(storage, `submissions/${currentUser.id}/${task.id}/${fileToUpload.name}`);
+        const fileRef = ref(storage, `submissions/${currentUser.id}/${taskId}/${fileToUpload.name}`);
         await uploadBytes(fileRef, fileToUpload);
         fileUrl = await getDownloadURL(fileRef);
         toast({ title: "File Uploaded", description: "Your file has been uploaded successfully." });
@@ -70,8 +70,8 @@ export function TaskSubmissionForm({ task }) {
 
       const submissionData = {
         userId: currentUser.id,
-        taskId: task.id,
-        taskTitle: task.title,
+        taskId: taskId,
+        taskTitle: taskTitle,
         caption: data.caption,
         fileUrl: fileUrl,
         submittedAt: serverTimestamp(),
@@ -83,7 +83,7 @@ export function TaskSubmissionForm({ task }) {
 
       toast({
         title: "Submission Successful!",
-        description: `Your submission for "${task.title}" has been received.`,
+        description: `Your submission for "${taskTitle}" has been received.`,
         variant: "default",
       });
       form.reset();
