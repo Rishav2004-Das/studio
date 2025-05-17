@@ -37,7 +37,7 @@ const submissionFormSchema = z.object({
 });
 
 
-export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) { // Added taskTokens
+export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,22 +70,22 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) { // Added
 
       const submissionData = {
         userId: currentUser.id,
-        submitterName: currentUser.name || "Unknown User", // Store submitter's name
+        submitterName: currentUser.name || "Unknown User",
         taskId: taskId,
         taskTitle: taskTitle,
-        originalTaskTokens: taskTokens || 0, // Store original tokens for the task
+        originalTaskTokens: taskTokens || 0,
         caption: data.caption,
         fileUrl: fileUrl,
         submittedAt: serverTimestamp(),
-        status: "Pending", // Default status
-        tokensAwarded: 0, // Default, to be updated by admin
+        status: "Pending", 
+        tokensAwarded: 0, 
       };
 
       await addDoc(collection(db, "submissions"), submissionData);
 
       toast({
         title: "Submission Successful!",
-        description: `Your submission for "${taskTitle}" has been received.`,
+        description: `Your submission for "${taskTitle}" has been received and saved for review.`,
         variant: "default",
       });
       form.reset();
