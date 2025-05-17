@@ -2,26 +2,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTheme } from '@/hooks/use-theme'; 
-import { Button, buttonVariants } from '@/components/ui/button'; 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+import { useTheme } from '@/hooks/use-theme.js'; 
+import { Button, buttonVariants } from '@/components/ui/button.jsx'; 
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card.jsx';
+import { Label } from '@/components/ui/label.jsx';
+import { Switch } from '@/components/ui/switch.jsx';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { useToast } from '@/hooks/use-toast.js';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form.jsx';
 import { Sun, Moon, LogOut, Trash2, LockKeyhole } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { Separator } from '@/components/ui/separator.jsx';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/auth-context';
-import { auth, db } from '@/lib/firebase/config';
+import { useAuth } from '@/contexts/auth-context.jsx';
+import { auth, db } from '@/lib/firebase/config.js';
 import { signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser as deleteFirebaseUser } from 'firebase/auth';
 import { doc, deleteDoc } from 'firebase/firestore';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton.jsx';
+import { cn } from '@/lib/utils.js';
 
 const updatePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: 'Current password is required.' }),
@@ -40,7 +41,9 @@ export default function SettingsPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [isPasswordUpdateLoading, setIsPasswordUpdateLoading] = useState(false);
   const [isDeleteAccountLoading, setIsDeleteAccountLoading] = useState(false);
-   const [isLogoutLoading, setIsLogoutLoading] = useState(false);
+  const [isLogoutLoading, setIsLogoutLoading] = useState(false);
+  const [passwordForDelete, setPasswordForDelete] = useState('');
+  const [isDeleteDialogPasswordEmpty, setIsDeleteDialogPasswordEmpty] = useState(false);
 
 
   const passwordForm = useForm({
@@ -80,21 +83,25 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
+    if (!passwordForDelete) {
+        toast({
+            title: 'Password Required',
+            description: 'Please enter your current password to confirm deletion.',
+            variant: 'destructive',
+        });
+        setIsDeleteDialogPasswordEmpty(true);
+        return;
+    }
+    setIsDeleteDialogPasswordEmpty(false);
+
     if (!firebaseUser || !firebaseUser.email) {
         toast({ title: "Error", description: "User not found or email missing for re-authentication.", variant: "destructive" });
         return;
     }
     setIsDeleteAccountLoading(true);
-
-    const currentPassword = prompt("Please enter your current password to confirm account deletion:");
-    if (!currentPassword) {
-        toast({ title: "Cancelled", description: "Account deletion cancelled." });
-        setIsDeleteAccountLoading(false);
-        return;
-    }
     
     try {
-        const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword);
+        const credential = EmailAuthProvider.credential(firebaseUser.email, passwordForDelete);
         await reauthenticateWithCredential(firebaseUser, credential);
 
         // Delete user data from Firestore
@@ -108,12 +115,14 @@ export default function SettingsPage() {
             title: 'Account Deleted',
             description: 'Your account has been permanently deleted.',
         });
+        setPasswordForDelete(''); 
         // AuthContext will handle UI update
     } catch (error) {
         console.error("Error deleting account: ", error);
         let desc = "Could not delete your account. Please try again.";
         if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
             desc = "Incorrect password. Account deletion failed.";
+            setPasswordForDelete(''); // Clear password if it was wrong
         } else if (error.code === 'auth/requires-recent-login') {
             desc = "This operation is sensitive and requires recent authentication. Please log out and log back in before trying again.";
         }
@@ -322,12 +331,41 @@ export default function SettingsPage() {
                       <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                       <AlertDialogDescription>
                         This action cannot be undone. This will permanently delete your
-                        account and remove your data. You will be asked for your current password.
+                        account and remove your data. Please enter your current password to confirm.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="py-2">
+                      <Label htmlFor="delete-password-input" className="sr-only">Current Password</Label>
+                      <Input
+                        id="delete-password-input"
+                        type="password"
+                        placeholder="Enter your current password"
+                        value={passwordForDelete}
+                        onChange={(e) => {
+                            setPasswordForDelete(e.target.value);
+                            if (isDeleteDialogPasswordEmpty && e.target.value) {
+                                setIsDeleteDialogPasswordEmpty(false);
+                            }
+                        }}
+                        className={cn(isDeleteDialogPasswordEmpty && "border-destructive ring-destructive focus-visible:ring-destructive")}
+                      />
+                      {isDeleteDialogPasswordEmpty && <p className="text-xs text-destructive mt-1">Password is required to delete account.</p>}
+                    </div>
                     <AlertDialogFooter>
-                      <AlertDialogCancel disabled={isDeleteAccountLoading}>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDeleteAccount} className={buttonVariants({ variant: "destructive" })} disabled={isDeleteAccountLoading}>
+                      <AlertDialogCancel 
+                        onClick={() => {
+                          setPasswordForDelete(''); 
+                          setIsDeleteDialogPasswordEmpty(false);
+                        }} 
+                        disabled={isDeleteAccountLoading}
+                      >
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleDeleteAccount} 
+                        className={buttonVariants({ variant: "destructive" })} 
+                        disabled={isDeleteAccountLoading}
+                      >
                         {isDeleteAccountLoading ? "Deleting..." : "Yes, delete account"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
