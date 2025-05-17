@@ -73,16 +73,16 @@ export default function AdminReviewPage() {
       if (error.code === 'failed-precondition') {
         description += ` This often means a required Firestore index is missing. Please check your browser's developer console (usually under the "Console" or "Network" tab) for a message from Firebase with a link to create the index. The link will look like 'https://console.firebase.google.com/project/your-project-id/firestore/indexes?create_composite=...'`;
       } else if (error.code === 'permission-denied') {
-        description += ` Permission denied. Please ensure your Firestore security rules allow admin users to list submissions based on status and order them by submission date. Also, verify the logged-in user has 'isAdmin: true' in their Firestore 'users' document.`;
+        description += ` Permission denied. Please ensure your Firestore security rules allow admin users to list submissions based on status and order them by submission date. Also, verify the logged-in user has 'isAdmin: true' in their Firestore 'users' document. It's also possible this 'permission-denied' error is masking a missing Firestore index; check the browser's developer console for any index creation links from Firebase.`;
       } else {
-        description += ` ${error.message || 'An unknown error occurred.'}`;
+        description += ` ${error.message || 'An unknown error occurred.'} Check the browser's developer console for more details, including potential links to create Firestore indexes.`;
       }
       
       toast({
         title: title,
         description: description,
         variant: 'destructive',
-        duration: 12000, // Increased duration for more complex message
+        duration: 15000, // Increased duration for more complex message
       });
     } finally {
       setIsLoading(false);
@@ -114,6 +114,10 @@ export default function AdminReviewPage() {
       await runTransaction(db, async (transaction) => {
         const submissionRef = doc(db, 'submissions', selectedSubmission.id);
         const userRef = doc(db, 'users', selectedSubmission.userId);
+
+        // It's good practice to read the user document within the transaction if you base logic on its current state,
+        // but for a simple increment, it might not be strictly necessary if rules prevent negative balances.
+        // For this example, we'll proceed directly with the increment.
 
         transaction.update(submissionRef, {
           status: 'Approved',
@@ -153,7 +157,7 @@ export default function AdminReviewPage() {
       const submissionRef = doc(db, 'submissions', selectedSubmission.id);
       await updateDoc(submissionRef, {
         status: 'Rejected',
-        tokensAwarded: 0,
+        tokensAwarded: 0, // Explicitly set to 0
         reviewedAt: serverTimestamp(),
       });
       toast({
@@ -306,4 +310,5 @@ export default function AdminReviewPage() {
       </AlertDialog>
     </div>
   );
-}
+
+    
