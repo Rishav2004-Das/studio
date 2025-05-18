@@ -12,9 +12,10 @@ export default function AdminLayout({ children }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (!currentUser || !currentUser.isAdmin) {
-        // Redirect to home page if user is not an admin or not logged in
+    if (!isLoading) { // Only proceed if auth state is resolved
+      // If currentUser is explicitly null (not loaded yet or logged out)
+      // OR if currentUser is loaded but is not an admin
+      if (currentUser === null || (currentUser && !currentUser.isAdmin)) {
         router.replace('/'); 
       }
     }
@@ -32,8 +33,9 @@ export default function AdminLayout({ children }) {
     );
   }
 
+  // This check covers the case where useEffect might not have run yet or if redirection is pending
+  // It also ensures that if currentUser becomes null after initial load (e.g. manual logout in another tab, token expiry if handled this way), access is revoked.
   if (!currentUser || !currentUser.isAdmin) {
-    // This state might be briefly visible before redirection, or if redirection fails.
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center p-4 text-center">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
@@ -44,6 +46,6 @@ export default function AdminLayout({ children }) {
     );
   }
 
-  // If user is an admin, render the children (the admin page)
+  // If user is an admin and auth is not loading, render the children
   return <>{children}</>;
 }
