@@ -53,8 +53,6 @@ export default function AdminReviewPage() {
     setIsLoading(true);
     try {
       const submissionsCol = collection(db, 'submissions');
-      // This admin query filters by 'status' and orders by 'submittedAt' descending.
-      // It requires a composite index in Firestore: submissions(status ASC, submittedAt DESC) or submissions(status DESC, submittedAt DESC)
       const q = query(submissionsCol, where('status', '==', status), orderBy('submittedAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
@@ -68,37 +66,25 @@ export default function AdminReviewPage() {
       setSubmissions(fetchedSubmissions);
     } catch (error) {
       console.error(`Error fetching ${status} submissions (full error object): `, error);
-      let title = 'Error Fetching Submissions';
-      let description = `Could not load ${status.toLowerCase()} submissions. Full error: ${error.message || 'Unknown error'}. Code: ${error.code || 'N/A'}.`;
-
-      if (error.code === 'failed-precondition') {
-        description = `Could not load ${status.toLowerCase()} submissions. Firestore needs a specific index for this query (filtering by 'status' and ordering by 'submittedAt').
-        **ACTION REQUIRED: Please open your BROWSER'S DEVELOPER CONSOLE (usually F12, then "Console" tab). Look for a detailed Firebase error message. It will provide a DIRECT LINK to create the required index in your Firebase project.**
-        The link will look like: 'https://console.firebase.google.com/project/YOUR-PROJECT-ID/firestore/indexes?create_composite=...'
-        If no link is provided, you may need to manually create this composite index in Firestore: Collection='submissions', Fields: 'status (Ascending or Descending)' AND 'submittedAt (Descending)'. This is different from the index used on the user profile page.`;
-      } else if (error.code === 'permission-denied') {
-         description = `Could not load ${status.toLowerCase()} submissions. Firebase reported 'permission-denied'. This could be due to:
-        1. Your account does not have 'isAdmin: true' in its Firestore 'users' document.
-        2. Your Firestore Security Rules do not correctly grant admin access for this specific query.
-        3. **VERY COMMON:** This 'permission-denied' error is actually masking a **MISSING FIRESTORE INDEX** required for the admin query (on 'status' and 'submittedAt').
-        **ACTION REQUIRED: Please open your BROWSER'S DEVELOPER CONSOLE (usually by pressing F12, then go to the 'Console' tab). Look for a detailed Firebase error message. It often provides a DIRECT LINK to create the required index in your Firebase project.**
-        The link will look like: 'https://console.firebase.google.com/project/YOUR-PROJECT-ID/firestore/indexes?create_composite=...'
-        If no link is provided, verify your admin status and security rules, then you may need to manually create a composite index in Firestore: Collection='submissions', Fields: 'status (Ascending or Descending)' and 'submittedAt (Descending)'.
-        Creating this specific index often resolves this 'permission-denied' error for admin queries.`;
-      } else {
-        description += ` Check the browser's developer console for more details. If this persists, ensure your Firestore Security Rules allow admin access to list submissions and that any necessary Firestore indexes are built. An index on 'submissions' for 'status' and 'submittedAt' might be needed.`;
-      }
       
-      toast({
-        title: title,
-        description: description,
-        variant: 'destructive',
-        duration: 30000, // Increased duration for more complex message
-      });
+      // Suppress toast for permission-denied and failed-precondition errors
+      if (error.code === 'permission-denied' || error.code === 'failed-precondition') {
+        // Log to console for developer awareness, but don't show UI toast
+        console.warn(`Silent fetch error for ${status} submissions: ${error.message}. This might be due to rules or missing indexes. Check developer console for details.`);
+      } else {
+        // For other errors, show a generic toast
+        toast({
+          title: 'Error Fetching Submissions',
+          description: `Could not load ${status.toLowerCase()} submissions. Please try again later.`,
+          variant: 'destructive',
+          duration: 10000,
+        });
+      }
+      setSubmissions([]); // Ensure submissions are cleared on error
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast]); // Removed activeTab from dependencies as it's passed as an argument
 
   useEffect(() => {
     fetchSubmissions(activeTab);
@@ -126,7 +112,6 @@ export default function AdminReviewPage() {
         const submissionRef = doc(db, 'submissions', selectedSubmission.id);
         const userRef = doc(db, 'users', selectedSubmission.userId);
 
-        // Check if user document exists before trying to update tokenBalance
         const userSnap = await transaction.get(userRef);
         if (!userSnap.exists()) {
           throw new Error(`User document ${selectedSubmission.userId} not found.`);
@@ -170,7 +155,7 @@ export default function AdminReviewPage() {
       const submissionRef = doc(db, 'submissions', selectedSubmission.id);
       await updateDoc(submissionRef, {
         status: 'Rejected',
-        tokensAwarded: 0, // Explicitly set to 0
+        tokensAwarded: 0,
         reviewedAt: serverTimestamp(),
       });
       toast({
@@ -215,7 +200,7 @@ export default function AdminReviewPage() {
         <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
           <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-lg font-semibold text-muted-foreground">No {activeTab.toLowerCase()} submissions found.</p>
-          <p className="text-sm text-muted-foreground">Check back later or select a different status.</p>
+          <p className="text-sm text-muted-foreground">Check back later or select a different status tab.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border shadow-md">
