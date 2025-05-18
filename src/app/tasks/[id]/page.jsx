@@ -11,7 +11,7 @@ import { ArrowLeft } from "lucide-react";
 
 export async function generateMetadata({ params }) {
   const taskId = params.id;
-  const task = getTaskById(taskId);
+  const task = await getTaskById(taskId); // Await the async function
   if (!task) {
     return {
       title: "Task Not Found | Telebounties"
@@ -24,6 +24,7 @@ export async function generateMetadata({ params }) {
 }
 
 export async function generateStaticParams() {
+  // mockTasks can be used directly if it's just an array of objects with 'id'
   return mockTasks.map((task) => ({
     id: task.id,
   }));
@@ -31,7 +32,7 @@ export async function generateStaticParams() {
 
 export default async function TaskDetailPage({ params }) {
   const taskId = params.id;
-  const task = getTaskById(taskId);
+  const task = await getTaskById(taskId); // Await the async function
 
   if (!task) {
     notFound();

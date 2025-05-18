@@ -25,7 +25,7 @@ export const mockTasks = [
     title: "Create Meme",
     description: "Create a funny and engaging meme related to our brand. Submit the image file.",
     tokens: 50,
-    icon: "SmilePlus",
+    icon: "SmilePlus", // Storing icon name as string
     category: "Content Creation",
   },
   {
@@ -33,7 +33,7 @@ export const mockTasks = [
     title: "Upload Tweet",
     description: "Draft and share a tweet promoting our latest feature. Provide the tweet text.",
     tokens: 30,
-    icon: "MessageSquare",
+    icon: "MessageSquare", // Storing icon name as string
     category: "Social Media",
   },
   {
@@ -41,7 +41,7 @@ export const mockTasks = [
     title: "Share Blog Post",
     description: "Share our latest blog post on your preferred social media platform. Submit a link to your share.",
     tokens: 40,
-    icon: "FileText",
+    icon: "FileText", // Storing icon name as string
     category: "Social Media",
   },
   {
@@ -49,7 +49,7 @@ export const mockTasks = [
     title: "Run a Poll",
     description: "Create and run a poll related to user preferences for new features. Submit poll results/summary.",
     tokens: 60,
-    icon: "ListChecks",
+    icon: "ListChecks", // Storing icon name as string
     category: "Engagement",
   },
   {
@@ -57,7 +57,7 @@ export const mockTasks = [
     title: "Create Short Video",
     description: "Produce a short video (15-30 seconds) showcasing our product in action. Submit the video file.",
     tokens: 100,
-    icon: "Video",
+    icon: "Video", // Storing icon name as string
     category: "Content Creation",
   },
 ];
@@ -66,7 +66,7 @@ export const mockSubmissions = [
   {
     id: "sub1",
     taskId: "1",
-    userId: "user123_placeholder", // This will be replaced by actual user ID from Firestore
+    userId: "user123_placeholder", 
     taskTitle: "Create Meme",
     caption: "Check out this hilarious meme I made!",
     fileUrl: "https://picsum.photos/seed/meme1/400/300",
@@ -98,27 +98,24 @@ export const mockSubmissions = [
   },
 ];
 
-export const getTaskById = (id) => {
+// Changed to async function
+export async function getTaskById(id) {
   const task = mockTasks.find((task) => task.id === id);
   if (task) {
     // Explicitly create a new plain object to ensure no complex references are passed
-    return {
+    // This ensures the object is serializable
+    return Promise.resolve({
       id: task.id,
       title: task.title,
       description: task.description,
       tokens: task.tokens,
-      icon: task.icon,
+      icon: task.icon, // icon is now a string
       category: task.category,
-    };
+    });
   }
-  return undefined;
-};
+  return Promise.resolve(undefined);
+}
 
-// This function is now primarily for Firestore queries.
-// The mockSubmissions are illustrative but not directly used by getSubmissionsByUserId anymore
-// if the profile page fetches from Firestore.
 export const getSubmissionsByUserId = (userId) => {
-  // For actual data, Firestore will be queried in the component.
-  // This mock version can be kept for reference or testing if needed.
-  return mockSubmissions.filter(sub => sub.userId === "user123_placeholder"); // Example, will not be reactive
+  return mockSubmissions.filter(sub => sub.userId === "user123_placeholder"); 
 };
