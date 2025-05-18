@@ -72,15 +72,18 @@ export default function AdminReviewPage() {
       let description = `Could not load ${status.toLowerCase()} submissions. Full error: ${error.message || 'Unknown error'}. Code: ${error.code || 'N/A'}.`;
 
       if (error.code === 'failed-precondition') {
-        description += ` This often means a required Firestore index is missing for the admin query (filtering by 'status' and ordering by 'submittedAt'). Please check your browser's developer console (usually F12, then "Console" tab) for a message from Firebase with a specific link to create this index. It will look like 'https://console.firebase.google.com/project/your-project-id/firestore/indexes?create_composite=...' If no link is provided, you may need to create it manually: Collection='submissions', Fields='status (Asc/Desc), submittedAt (Desc)'.`;
+        description = `Could not load ${status.toLowerCase()} submissions. Firestore needs a specific index for this query (filtering by 'status' and ordering by 'submittedAt').
+        **ACTION REQUIRED: Please open your BROWSER'S DEVELOPER CONSOLE (usually F12, then "Console" tab). Look for a detailed Firebase error message. It will provide a DIRECT LINK to create the required index in your Firebase project.**
+        The link will look like: 'https://console.firebase.google.com/project/YOUR-PROJECT-ID/firestore/indexes?create_composite=...'
+        If no link is provided, you may need to manually create this composite index in Firestore: Collection='submissions', Fields: 'status (Ascending or Descending)' AND 'submittedAt (Descending)'. This is different from the index used on the user profile page.`;
       } else if (error.code === 'permission-denied') {
-        description += ` Firebase reported 'permission-denied'. This could be due to:
+         description = `Could not load ${status.toLowerCase()} submissions. Firebase reported 'permission-denied'. This could be due to:
         1. Your account does not have 'isAdmin: true' in its Firestore 'users' document.
         2. Your Firestore Security Rules do not correctly grant admin access for this specific query.
         3. **VERY COMMON:** This 'permission-denied' error is actually masking a **MISSING FIRESTORE INDEX** required for the admin query (on 'status' and 'submittedAt').
         **ACTION REQUIRED: Please open your BROWSER'S DEVELOPER CONSOLE (usually by pressing F12, then go to the 'Console' tab). Look for a detailed Firebase error message. It often provides a DIRECT LINK to create the required index in your Firebase project.**
         The link will look like: 'https://console.firebase.google.com/project/YOUR-PROJECT-ID/firestore/indexes?create_composite=...'
-        If no link is provided, you may need to manually create a composite index in Firestore: Collection='submissions', Fields: 'status (Ascending or Descending)' and 'submittedAt (Descending)'.
+        If no link is provided, verify your admin status and security rules, then you may need to manually create a composite index in Firestore: Collection='submissions', Fields: 'status (Ascending or Descending)' and 'submittedAt (Descending)'.
         Creating this specific index often resolves this 'permission-denied' error for admin queries.`;
       } else {
         description += ` Check the browser's developer console for more details. If this persists, ensure your Firestore Security Rules allow admin access to list submissions and that any necessary Firestore indexes are built. An index on 'submissions' for 'status' and 'submittedAt' might be needed.`;
@@ -320,4 +323,4 @@ export default function AdminReviewPage() {
       </AlertDialog>
     </div>
   );
- 
+}
