@@ -16,29 +16,28 @@ import {
 import { Input } from "@/components/ui/input.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { useToast } from "@/hooks/use-toast.js";
-import { Send, LogIn, Paperclip } from "lucide-react"; // Added Paperclip
+import { Send, LogIn, Paperclip } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context.jsx";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.jsx";
 import { Skeleton } from "@/components/ui/skeleton.jsx";
-import { useState, useRef } from "react"; // Added useRef
-import { db, storage } from '@/lib/firebase/config.js'; // Added storage
+import { useState, useRef } from "react";
+import { db, storage } from '@/lib/firebase/config.js';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; // Added storage functions
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Updated schema to include an optional file
 const submissionFormSchema = z.object({
   caption: z.string().min(10, {
     message: "Caption must be at least 10 characters.",
   }).max(500, {
     message: "Caption must not exceed 500 characters.",
   }),
-  file: z.instanceof(FileList).optional() // File is optional
-    .refine(files => !files || files.length === 0 || files[0].size <= 5 * 1024 * 1024, {
-      message: "File size must be 5MB or less." // Example size limit
+  file: z.instanceof(FileList).optional()
+    .refine(files => !files || files.length === 0 || files[0].size <= 5 * 1024 * 1024, { // 5MB limit
+      message: "File size must be 5MB or less."
     })
     .refine(files => !files || files.length === 0 || ["image/jpeg", "image/png", "image/gif", "application/pdf", "video/mp4"].includes(files[0].type), {
-      message: "Only JPG, PNG, GIF, PDF, or MP4 files are allowed." // Example type limit
+      message: "Only JPG, PNG, GIF, PDF, or MP4 files are allowed."
     }),
 });
 
@@ -47,8 +46,8 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [fileToUpload, setFileToUpload] = useState(null); // State for the selected file
-  const fileInputRef = useRef(null); // Ref for the file input
+  const [fileToUpload, setFileToUpload] = useState(null);
+  const fileInputRef = useRef(null);
 
   const form = useForm({
     resolver: zodResolver(submissionFormSchema),
@@ -65,12 +64,22 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
     }
     setIsSubmitting(true);
     let fileUrl = null;
+    let uploadedFileName = null;
 
     try {
+      console.log("[TaskSubmission] Form data submitted:", data);
       if (fileToUpload) {
+        uploadedFileName = fileToUpload.name;
+        console.log(`[TaskSubmission] Attempting to upload file: ${uploadedFileName} (Size: ${fileToUpload.size} bytes, Type: ${fileToUpload.type}) to Firebase Storage...`);
         const storageRef = ref(storage, `submissions/${currentUser.id}/${taskId}/${fileToUpload.name}`);
+        
         await uploadBytes(storageRef, fileToUpload);
+        console.log("[TaskSubmission] Firebase Storage upload COMPLETE.");
+        
         fileUrl = await getDownloadURL(storageRef);
+        console.log("[TaskSubmission] Got download URL:", fileUrl);
+      } else {
+        console.log("[TaskSubmission] No file selected for upload.");
       }
 
       const submissionData = {
@@ -80,37 +89,57 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
         taskTitle: taskTitle,
         originalTaskTokens: taskTokens || 0,
         caption: data.caption,
-        fileUrl: fileUrl, // Save the file URL
+        fileUrl: fileUrl,
         submittedAt: serverTimestamp(),
         status: "Pending",
         tokensAwarded: 0,
       };
 
+      console.log("[TaskSubmission] Attempting to add submission to Firestore:", submissionData);
       await addDoc(collection(db, "submissions"), submissionData);
+      console.log("[TaskSubmission] Firestore document added successfully.");
 
       toast({
         title: "Submission Successful!",
-        description: `Your submission for "${taskTitle}" ${fileToUpload ? 'with the attached file ' : ''}has been received for review.`,
+        description: `Your submission for "${taskTitle}" ${uploadedFileName ? `with file "${uploadedFileName}" ` : ''}has been received for review.`,
         variant: "default",
         duration: 7000,
       });
       form.reset();
       setFileToUpload(null);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ''; // Clear the file input visually
+        fileInputRef.current.value = '';
       }
     } catch (error) {
-      console.error("Submission error:", error);
+      console.error("[TaskSubmission] Full submission error object:", error);
       let description = "Could not submit your task. Please try again.";
-      if (error.code && error.code.startsWith('storage/')) {
-        description = `File upload failed: ${error.message}. Please check file size/type or network.`;
+      
+      if (error.name === 'FirebaseError') {
+        description = `Submission failed: ${error.message} (Code: ${error.code || 'N/A'}).`;
+        if (error.code && error.code.startsWith('storage/')) {
+          description = `File upload failed: ${error.message}. This could be a CORS issue on your Firebase Storage bucket or a Storage security rule. Please check your browser's developer console for more details (Network tab, CORS errors).`;
+          if (error.code === 'storage/unauthorized') {
+            description += " Ensure your Firebase Storage rules allow uploads to the 'submissions/' path for authenticated users.";
+          }
+           if (error.code === 'storage/object-not-found' && error.message.includes('does not have HTTP ok status')) {
+             description = "File upload failed: CORS policy might be blocking the request. Please ensure CORS is configured correctly on your Firebase Storage bucket for your application's origin."
+           }
+        } else if (error.code === 'permission-denied') { // Firestore permission denied
+            description = `Submission to database failed: Permission denied. Please check your Firestore security rules for the 'submissions' collection. (Code: ${error.code})`;
+        }
+      } else if (error instanceof z.ZodError) {
+        description = "Invalid submission data. Please check the form fields.";
+        // Zod errors are usually handled by FormMessage, but good to have a general catch.
       }
+      
       toast({
         title: "Submission Failed",
         description: description,
         variant: "destructive",
+        duration: 10000, // Longer duration for error messages
       });
     } finally {
+      console.log("[TaskSubmission] Reached finally block. Setting isSubmitting to false.");
       setIsSubmitting(false);
     }
   }
@@ -177,26 +206,26 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
         <FormField
           control={form.control}
           name="file"
-          render={({ field: { onChange, onBlur, name, ref: formRef } }) => ( // Use react-hook-form's ref
+          render={({ field: { onChange, onBlur, name, ref: formHookRef } }) => (
             <FormItem>
               <FormLabel htmlFor="file-upload" className="flex items-center">
-                <Paperclip className="mr-2 h-4 w-4" /> Attach File (Optional)
+                <Paperclip className="mr-2 h-4 w-4" /> Attach File (Optional, Max 5MB: JPG, PNG, GIF, PDF, MP4)
               </FormLabel>
               <FormControl>
                 <Input
-                  id="file-upload"
+                  id="file-upload" // Keep id for label's htmlFor association
                   type="file"
                   onBlur={onBlur}
                   name={name}
-                  ref={node => { // Combine refs
-                      formRef(node); // react-hook-form's ref
-                      fileInputRef.current = node; // Your local ref
+                  ref={node => {
+                      formHookRef(node);
+                      fileInputRef.current = node; 
                   }}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
                       setFileToUpload(file);
-                      onChange(e.target.files); // Pass FileList to react-hook-form
+                      onChange(e.target.files); 
                     } else {
                       setFileToUpload(null);
                       onChange(null);
@@ -223,3 +252,5 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
     </Form>
   );
 }
+
+    
