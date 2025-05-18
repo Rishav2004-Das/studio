@@ -74,7 +74,13 @@ export default function AdminReviewPage() {
       if (error.code === 'failed-precondition') {
         description += ` This often means a required Firestore index is missing for the admin query (filtering by 'status' and ordering by 'submittedAt'). Please check your browser's developer console (usually under the "Console" or "Network" tab) for a message from Firebase with a specific link to create this new index. It will look like 'https://console.firebase.google.com/project/your-project-id/firestore/indexes?create_composite=...'`;
       } else if (error.code === 'permission-denied') {
-        description += ` Permission denied. Ensure your Firestore security rules allow admin users to list submissions based on status and order them by submission date. Also, verify the logged-in user has 'isAdmin: true' in their Firestore 'users' document. It's also possible this 'permission-denied' error is masking a missing Firestore index for the admin query (on 'status' and 'submittedAt'); check the browser's developer console for any index creation links from Firebase.`;
+        description += ` Firebase reported 'permission-denied'. This could be due to several reasons:
+        1. Your account does not have 'isAdmin: true' in its Firestore 'users' document.
+        2. Your Firestore Security Rules do not correctly grant admin access for this specific query.
+        3. **VERY COMMON:** This 'permission-denied' error is actually masking a **MISSING FIRESTORE INDEX** required for the admin query (which filters by 'status' and orders by 'submittedAt').
+        **ACTION REQUIRED: Please open your BROWSER'S DEVELOPER CONSOLE (usually by pressing F12, then go to the 'Console' tab). Look for a detailed Firebase error message. It often provides a DIRECT LINK to create the required index in your Firebase project.**
+        The link will look like: 'https://console.firebase.google.com/project/YOUR-PROJECT-ID/firestore/indexes?create_composite=...'
+        Creating this specific index (for 'status' and 'submittedAt') often resolves this 'permission-denied' error for admin queries.`;
       } else {
         description += ` ${error.message || 'An unknown error occurred.'} Check the browser's developer console for more details, including potential links to create Firestore indexes for the admin query (on 'status' and 'submittedAt').`;
       }
@@ -83,7 +89,7 @@ export default function AdminReviewPage() {
         title: title,
         description: description,
         variant: 'destructive',
-        duration: 20000, // Increased duration for more complex message
+        duration: 30000, // Increased duration for more complex message
       });
     } finally {
       setIsLoading(false);
