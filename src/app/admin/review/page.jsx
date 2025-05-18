@@ -53,8 +53,8 @@ export default function AdminReviewPage() {
     setIsLoading(true);
     try {
       const submissionsCol = collection(db, 'submissions');
-      // This admin query requires a composite index on 'status' (asc/desc) and 'submittedAt' (desc)
-      // This is different from the index (userId, submittedAt) used for user profiles.
+      // This admin query filters by 'status' and orders by 'submittedAt' descending.
+      // It requires a composite index in Firestore: submissions(status ASC, submittedAt DESC) or submissions(status DESC, submittedAt DESC)
       const q = query(submissionsCol, where('status', '==', status), orderBy('submittedAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
@@ -69,20 +69,21 @@ export default function AdminReviewPage() {
     } catch (error) {
       console.error(`Error fetching ${status} submissions (full error object): `, error);
       let title = 'Error Fetching Submissions';
-      let description = `Could not load ${status.toLowerCase()} submissions.`;
+      let description = `Could not load ${status.toLowerCase()} submissions. Full error: ${error.message || 'Unknown error'}. Code: ${error.code || 'N/A'}.`;
 
       if (error.code === 'failed-precondition') {
-        description += ` This often means a required Firestore index is missing for the admin query (filtering by 'status' and ordering by 'submittedAt'). Please check your browser's developer console (usually under the "Console" or "Network" tab) for a message from Firebase with a specific link to create this new index. It will look like 'https://console.firebase.google.com/project/your-project-id/firestore/indexes?create_composite=...'`;
+        description += ` This often means a required Firestore index is missing for the admin query (filtering by 'status' and ordering by 'submittedAt'). Please check your browser's developer console (usually F12, then "Console" tab) for a message from Firebase with a specific link to create this index. It will look like 'https://console.firebase.google.com/project/your-project-id/firestore/indexes?create_composite=...' If no link is provided, you may need to create it manually: Collection='submissions', Fields='status (Asc/Desc), submittedAt (Desc)'.`;
       } else if (error.code === 'permission-denied') {
-        description += ` Firebase reported 'permission-denied'. This could be due to several reasons:
+        description += ` Firebase reported 'permission-denied'. This could be due to:
         1. Your account does not have 'isAdmin: true' in its Firestore 'users' document.
         2. Your Firestore Security Rules do not correctly grant admin access for this specific query.
-        3. **VERY COMMON:** This 'permission-denied' error is actually masking a **MISSING FIRESTORE INDEX** required for the admin query (which filters by 'status' and orders by 'submittedAt').
+        3. **VERY COMMON:** This 'permission-denied' error is actually masking a **MISSING FIRESTORE INDEX** required for the admin query (on 'status' and 'submittedAt').
         **ACTION REQUIRED: Please open your BROWSER'S DEVELOPER CONSOLE (usually by pressing F12, then go to the 'Console' tab). Look for a detailed Firebase error message. It often provides a DIRECT LINK to create the required index in your Firebase project.**
         The link will look like: 'https://console.firebase.google.com/project/YOUR-PROJECT-ID/firestore/indexes?create_composite=...'
-        Creating this specific index (for 'status' and 'submittedAt') often resolves this 'permission-denied' error for admin queries.`;
+        If no link is provided, you may need to manually create a composite index in Firestore: Collection='submissions', Fields: 'status (Ascending or Descending)' and 'submittedAt (Descending)'.
+        Creating this specific index often resolves this 'permission-denied' error for admin queries.`;
       } else {
-        description += ` ${error.message || 'An unknown error occurred.'} Check the browser's developer console for more details, including potential links to create Firestore indexes for the admin query (on 'status' and 'submittedAt').`;
+        description += ` Check the browser's developer console for more details. If this persists, ensure your Firestore Security Rules allow admin access to list submissions and that any necessary Firestore indexes are built. An index on 'submissions' for 'status' and 'submittedAt' might be needed.`;
       }
       
       toast({
@@ -121,6 +122,12 @@ export default function AdminReviewPage() {
       await runTransaction(db, async (transaction) => {
         const submissionRef = doc(db, 'submissions', selectedSubmission.id);
         const userRef = doc(db, 'users', selectedSubmission.userId);
+
+        // Check if user document exists before trying to update tokenBalance
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error(`User document ${selectedSubmission.userId} not found.`);
+        }
 
         transaction.update(submissionRef, {
           status: 'Approved',
@@ -313,4 +320,4 @@ export default function AdminReviewPage() {
       </AlertDialog>
     </div>
   );
-}
+ 
