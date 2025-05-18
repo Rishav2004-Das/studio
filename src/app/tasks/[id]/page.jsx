@@ -1,5 +1,5 @@
 
-import { getTaskById, mockTasks, getIconComponent } from "@/lib/mock-data.js";
+import { getTaskById, getIconComponent } from "@/lib/mock-data.js";
 import { notFound } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card.jsx";
 import { TaskSubmissionForm } from "@/components/tasks/task-submission-form.jsx";
@@ -10,7 +10,8 @@ import { ArrowLeft } from "lucide-react";
 
 
 export async function generateMetadata({ params }) {
-  const taskId = params.id;
+  const resolvedParams = await params; // Await params
+  const taskId = resolvedParams.id;
   const task = await getTaskById(taskId); // Await the async function
   if (!task) {
     return {
@@ -25,13 +26,23 @@ export async function generateMetadata({ params }) {
 
 export async function generateStaticParams() {
   // mockTasks can be used directly if it's just an array of objects with 'id'
+  // This needs to be an array of objects where each object has the 'id' property matching the dynamic segment.
+  const tasks = await getTaskById(); // Assuming getTaskById without an arg returns all tasks or ids
+                                     // Or, if you have a dedicated function like getAllTaskIds()
+  // If getTaskById() cannot return all task IDs, you might need to adjust this logic
+  // For now, let's assume you have a way to get all task IDs or use mockTasks directly if it's a static list
+  // and getTaskById is only for fetching a single task.
+  // Let's revert to mockTasks for generateStaticParams if getTaskById is only for single fetch.
+  // This depends on how getTaskById is structured. If it's from mock-data.js, mockTasks is better here.
+  const { mockTasks } = await import("@/lib/mock-data.js"); // Re-importing if needed
   return mockTasks.map((task) => ({
     id: task.id,
   }));
 }
 
 export default async function TaskDetailPage({ params }) {
-  const taskId = params.id;
+  const resolvedParams = await params; // Await params
+  const taskId = resolvedParams.id;
   const task = await getTaskById(taskId); // Await the async function
 
   if (!task) {
