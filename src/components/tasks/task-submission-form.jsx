@@ -13,32 +13,25 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form.jsx";
-import { Input } from "@/components/ui/input.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { useToast } from "@/hooks/use-toast.js";
-import { Send, LogIn, Paperclip } from "lucide-react";
+import { Send, LogIn, Info } from "lucide-react"; // Removed Paperclip
 import { useAuth } from "@/contexts/auth-context.jsx";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.jsx";
 import { Skeleton } from "@/components/ui/skeleton.jsx";
-import { useState, useRef } from "react";
-import { db, storage } from '@/lib/firebase/config.js';
+import { useState } from "react"; // Removed useRef
+import { db } from '@/lib/firebase/config.js'; // Removed storage
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+// Removed storage-related imports: ref, uploadBytes, getDownloadURL
 
+// Updated schema to remove file input
 const submissionFormSchema = z.object({
   caption: z.string().min(10, {
     message: "Caption must be at least 10 characters.",
   }).max(500, {
     message: "Caption must not exceed 500 characters.",
   }),
-  file: z.instanceof(FileList).optional()
-    .refine(files => !files || files.length === 0 || files[0].size <= 5 * 1024 * 1024, { // 5MB limit
-      message: "File size must be 5MB or less."
-    })
-    .refine(files => !files || files.length === 0 || ["image/jpeg", "image/png", "image/gif", "application/pdf", "video/mp4"].includes(files[0].type), {
-      message: "Only JPG, PNG, GIF, PDF, or MP4 files are allowed."
-    }),
 });
 
 
@@ -46,14 +39,13 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [fileToUpload, setFileToUpload] = useState(null);
-  const fileInputRef = useRef(null);
+  // Removed fileToUpload and fileInputRef
 
   const form = useForm({
     resolver: zodResolver(submissionFormSchema),
     defaultValues: {
       caption: "",
-      file: undefined,
+      // file: undefined, // Removed file default value
     },
   });
 
@@ -63,24 +55,11 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
       return;
     }
     setIsSubmitting(true);
-    let fileUrl = null;
-    let uploadedFileName = null;
+    // Removed fileUrl and uploadedFileName logic
 
     try {
-      console.log("[TaskSubmission] Form data submitted:", data);
-      if (fileToUpload) {
-        uploadedFileName = fileToUpload.name;
-        console.log(`[TaskSubmission] Attempting to upload file: ${uploadedFileName} (Size: ${fileToUpload.size} bytes, Type: ${fileToUpload.type}) to Firebase Storage...`);
-        const storageRef = ref(storage, `submissions/${currentUser.id}/${taskId}/${fileToUpload.name}`);
-        
-        await uploadBytes(storageRef, fileToUpload);
-        console.log("[TaskSubmission] Firebase Storage upload COMPLETE.");
-        
-        fileUrl = await getDownloadURL(storageRef);
-        console.log("[TaskSubmission] Got download URL:", fileUrl);
-      } else {
-        console.log("[TaskSubmission] No file selected for upload.");
-      }
+      console.log("[TaskSubmission] Form data submitted (no file):", data);
+      // Removed file upload logic
 
       const submissionData = {
         userId: currentUser.id,
@@ -89,7 +68,7 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
         taskTitle: taskTitle,
         originalTaskTokens: taskTokens || 0,
         caption: data.caption,
-        fileUrl: fileUrl,
+        fileUrl: null, // No file URL as uploads are disabled
         submittedAt: serverTimestamp(),
         status: "Pending",
         tokensAwarded: 0,
@@ -101,42 +80,30 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
 
       toast({
         title: "Submission Successful!",
-        description: `Your submission for "${taskTitle}" ${uploadedFileName ? `with file "${uploadedFileName}" ` : ''}has been received for review.`,
+        description: `Your submission for "${taskTitle}" has been received for review. File uploads are currently disabled.`,
         variant: "default",
         duration: 7000,
       });
       form.reset();
-      setFileToUpload(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      // Removed fileToUpload and fileInputRef reset
     } catch (error) {
       console.error("[TaskSubmission] Full submission error object:", error);
       let description = "Could not submit your task. Please try again.";
       
       if (error.name === 'FirebaseError') {
         description = `Submission failed: ${error.message} (Code: ${error.code || 'N/A'}).`;
-        if (error.code && error.code.startsWith('storage/')) {
-          description = `File upload failed: ${error.message}. This could be a CORS issue on your Firebase Storage bucket or a Storage security rule. Please check your browser's developer console for more details (Network tab, CORS errors).`;
-          if (error.code === 'storage/unauthorized') {
-            description += " Ensure your Firebase Storage rules allow uploads to the 'submissions/' path for authenticated users.";
-          }
-           if (error.code === 'storage/object-not-found' && error.message.includes('does not have HTTP ok status')) {
-             description = "File upload failed: CORS policy might be blocking the request. Please ensure CORS is configured correctly on your Firebase Storage bucket for your application's origin."
-           }
-        } else if (error.code === 'permission-denied') { // Firestore permission denied
+         if (error.code === 'permission-denied') { // Firestore permission denied
             description = `Submission to database failed: Permission denied. Please check your Firestore security rules for the 'submissions' collection. (Code: ${error.code})`;
         }
       } else if (error instanceof z.ZodError) {
         description = "Invalid submission data. Please check the form fields.";
-        // Zod errors are usually handled by FormMessage, but good to have a general catch.
       }
       
       toast({
         title: "Submission Failed",
         description: description,
         variant: "destructive",
-        duration: 10000, // Longer duration for error messages
+        duration: 10000,
       });
     } finally {
       console.log("[TaskSubmission] Reached finally block. Setting isSubmitting to false.");
@@ -203,54 +170,21 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="file"
-          render={({ field: { onChange, onBlur, name, ref: formHookRef } }) => (
-            <FormItem>
-              <FormLabel htmlFor="file-upload" className="flex items-center">
-                <Paperclip className="mr-2 h-4 w-4" /> Attach File (Optional, Max 5MB: JPG, PNG, GIF, PDF, MP4)
-              </FormLabel>
-              <FormControl>
-                <Input
-                  id="file-upload" // Keep id for label's htmlFor association
-                  type="file"
-                  onBlur={onBlur}
-                  name={name}
-                  ref={node => {
-                      formHookRef(node);
-                      fileInputRef.current = node; 
-                  }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setFileToUpload(file);
-                      onChange(e.target.files); 
-                    } else {
-                      setFileToUpload(null);
-                      onChange(null);
-                    }
-                  }}
-                  disabled={isSubmitting}
-                  className="file:text-primary file:font-medium"
-                />
-              </FormControl>
-              {fileToUpload && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Selected: {fileToUpload.name} ({(fileToUpload.size / 1024 / 1024).toFixed(2)} MB)
-                </p>
-              )}
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {/* File input section removed */}
+        <div className="p-4 border border-dashed rounded-md bg-muted/50 text-center">
+            <Info className="mx-auto h-6 w-6 text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">
+                File uploads are currently disabled for task submissions.
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+                Your submission will be based on the caption/details provided above.
+            </p>
+        </div>
 
         <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
-          {isSubmitting ? (fileToUpload ? "Uploading & Submitting..." : "Submitting...") : <><Send className="mr-2 h-4 w-4" /> Submit Task</>}
+          {isSubmitting ? "Submitting..." : <><Send className="mr-2 h-4 w-4" /> Submit Task</>}
         </Button>
       </form>
     </Form>
   );
 }
-
-    
