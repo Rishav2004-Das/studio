@@ -10,7 +10,8 @@ import { ArrowLeft } from "lucide-react";
 
 
 export async function generateMetadata({ params }) {
-  const task = getTaskById(params.id);
+  const taskId = params.id;
+  const task = getTaskById(taskId);
   if (!task) {
     return {
       title: "Task Not Found | Telebounties"
@@ -28,8 +29,9 @@ export async function generateStaticParams() {
   }));
 }
 
-export default function TaskDetailPage({ params }) {
-  const task = getTaskById(params.id);
+export default async function TaskDetailPage({ params }) {
+  const taskId = params.id;
+  const task = getTaskById(taskId);
 
   if (!task) {
     notFound();
