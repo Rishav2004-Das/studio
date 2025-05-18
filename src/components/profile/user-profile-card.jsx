@@ -1,11 +1,11 @@
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Award, UserCircle2, Camera, Loader2 } from "lucide-react"; 
-import { cn } from "@/lib/utils";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.jsx";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar.jsx";
+import { Award, UserCircle2 } from "lucide-react"; // Removed Camera, Loader2
+import { cn } from "@/lib/utils.js";
 
 
-export function UserProfileCard({ user, onAvatarClick, isOwnProfile = false, isUpdatingAvatar = false }) {
+export function UserProfileCard({ user, isOwnProfile = false }) { // Removed onAvatarClick, isUpdatingAvatar
   const fallbackInitials = user.name?.split(' ').map(n => n[0]).join('').toUpperCase() || <UserCircle2 />;
 
   return (
@@ -14,12 +14,11 @@ export function UserProfileCard({ user, onAvatarClick, isOwnProfile = false, isU
         <div className="relative group"> 
           <Avatar
             className={cn(
-              "h-24 w-24 border-4 border-primary sm:h-28 sm:w-28",
-              isOwnProfile && !isUpdatingAvatar && "cursor-pointer hover:opacity-80 transition-opacity",
-              isUpdatingAvatar && "opacity-50" 
+              "h-24 w-24 border-4 border-primary sm:h-28 sm:w-28"
+              // Removed cursor-pointer and opacity classes as click is disabled
             )}
-            onClick={isOwnProfile && !isUpdatingAvatar ? onAvatarClick : undefined}
-            title={isOwnProfile && !isUpdatingAvatar ? "Click to change photo" : (isUpdatingAvatar ? "Updating..." : "")}
+            // onClick removed
+            // title removed
           >
             {user.avatarUrl ? (
               <AvatarImage src={user.avatarUrl} alt={user.name || 'User avatar'} data-ai-hint="user avatar" />
@@ -28,15 +27,8 @@ export function UserProfileCard({ user, onAvatarClick, isOwnProfile = false, isU
               {fallbackInitials}
             </AvatarFallback>
           </Avatar>
-          {isOwnProfile && (
-            <div className={cn(
-                "absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity",
-                !isUpdatingAvatar && "opacity-70 group-hover:opacity-100",
-                isUpdatingAvatar ? "opacity-100" : "pointer-events-none group-hover:pointer-events-auto"
-              )}>
-              {isUpdatingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-            </div>
-          )}
+          {/* Removed camera icon overlay as uploads are disabled */}
+          {/* {isOwnProfile && ( ... )} */}
         </div>
         <div className="flex-1">
           <CardTitle className="text-3xl font-bold">{user.name}</CardTitle>

@@ -13,18 +13,17 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form.jsx";
-import { Input } from "@/components/ui/input.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { useToast } from "@/hooks/use-toast.js";
-import { UploadCloud, Send, LogIn } from "lucide-react";
+import { Send, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context.jsx";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.jsx";
 import { Skeleton } from "@/components/ui/skeleton.jsx";
 import { useState } from "react";
-import { db, storage } from '@/lib/firebase/config.js';
+import { db } from '@/lib/firebase/config.js'; // Removed 'storage'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+// Removed storage-related imports: ref, uploadBytes, getDownloadURL
 
 
 const submissionFormSchema = z.object({
@@ -33,7 +32,7 @@ const submissionFormSchema = z.object({
   }).max(500, {
     message: "Caption must not exceed 500 characters.",
   }),
-  file: z.any().optional(), // z.instanceof(File).optional() might be more specific if needed
+  // File field is no longer part of the form
 });
 
 
@@ -41,13 +40,13 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [fileToUpload, setFileToUpload] = useState(null);
+  // Removed fileToUpload state
 
   const form = useForm({
     resolver: zodResolver(submissionFormSchema),
     defaultValues: {
       caption: "",
-      file: undefined,
+      // file: undefined, // File field removed
     },
   });
 
@@ -57,16 +56,11 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
       return;
     }
     setIsSubmitting(true);
-    let fileUrl = null;
+    // let fileUrl = null; // File URL will always be null now
 
     try {
-      if (fileToUpload) {
-        toast({ title: "Uploading file...", description: "Please wait." });
-        const fileRef = ref(storage, `submissions/${currentUser.id}/${taskId}/${fileToUpload.name}`);
-        await uploadBytes(fileRef, fileToUpload);
-        fileUrl = await getDownloadURL(fileRef);
-        toast({ title: "File Uploaded", description: "Your file has been uploaded successfully." });
-      }
+      // File upload logic removed
+      // if (fileToUpload) { ... }
 
       const submissionData = {
         userId: currentUser.id,
@@ -75,7 +69,7 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
         taskTitle: taskTitle,
         originalTaskTokens: taskTokens || 0,
         caption: data.caption,
-        fileUrl: fileUrl,
+        fileUrl: null, // Explicitly set to null as uploads are disabled
         submittedAt: serverTimestamp(),
         status: "Pending",
         tokensAwarded: 0,
@@ -85,13 +79,12 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
 
       toast({
         title: "Submission Successful!",
-        description: `Your submission for "${taskTitle}" has been received and saved to the database for review.`,
+        description: `Your submission for "${taskTitle}" has been received and saved to the database for review. File uploads are currently disabled.`,
         variant: "default",
+        duration: 7000,
       });
       form.reset();
-      setFileToUpload(null);
-      // The line below attempting to clear by id is removed as id="file-input" is removed.
-      // form.reset() should handle clearing react-hook-form's state for the file input.
+      // setFileToUpload(null); // No longer needed
     } catch (error) {
       console.error("Submission error:", error);
       toast({
@@ -163,39 +156,13 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="file"
-          render={({ field: { onChange: onFieldChange, onBlur, name, ref } }) => (
-            <FormItem>
-              <FormLabel>Upload File (Optional)</FormLabel>
-              <div className="flex items-center space-x-2">
-                <UploadCloud className="h-5 w-5 text-muted-foreground" />
-                <FormControl>
-                  <Input
-                    type="file"
-                    onBlur={onBlur}
-                    name={name}
-                    ref={ref}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      onFieldChange(file || null); // Update react-hook-form's state
-                      setFileToUpload(file || null); // Update local state for upload
-                    }}
-                    className="block w-full text-sm text-slate-500
-                      file:mr-4 file:py-2 file:px-4
-                      file:rounded-full file:border-0
-                      file:text-sm file:font-semibold
-                      file:bg-primary/10 file:text-primary
-                      hover:file:bg-primary/20"
-                    disabled={isSubmitting}
-                  />
-                </FormControl>
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {/* File Input FormField removed */}
+        <div className="p-4 border border-dashed rounded-md bg-muted/50">
+            <p className="text-sm text-muted-foreground text-center">
+                File uploads are currently disabled for task submissions.
+            </p>
+        </div>
+
 
         <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
           {isSubmitting ? "Submitting..." : <><Send className="mr-2 h-4 w-4" /> Submit Task</>}

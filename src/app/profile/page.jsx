@@ -13,10 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Skeleton } from '@/components/ui/skeleton.jsx';
 import { useToast } from '@/hooks/use-toast.js';
 import { useAuth } from '@/contexts/auth-context.jsx';
-import { auth, db, storage } from '@/lib/firebase/config.js';
+import { auth, db } from '@/lib/firebase/config.js'; // Removed 'storage'
 import { signOut } from 'firebase/auth';
-import { doc, updateDoc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+// Removed storage-related imports: ref, uploadBytes, getDownloadURL, updateDoc
 
 export default function ProfilePage() {
   const { toast } = useToast();
@@ -25,8 +25,7 @@ export default function ProfilePage() {
   const [localCurrentUser, setLocalCurrentUser] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [showLogin, setShowLogin] = useState(true);
-  const fileInputRef = useRef(null);
-  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  // Removed fileInputRef, isUpdatingAvatar, handleAvatarClick, handleAvatarUpdate
   const [pageLoading, setPageLoading] = useState(true);
 
 
@@ -34,7 +33,19 @@ export default function ProfilePage() {
     if (!authLoading) {
       setPageLoading(false);
       if (currentUser && currentUser.id) {
-        setLocalCurrentUser(currentUser);
+        // Fetch user data again to ensure localCurrentUser is up-to-date
+        const fetchUserData = async () => {
+          const userDocRef = doc(db, 'users', currentUser.id);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            setLocalCurrentUser(userDocSnap.data());
+          } else {
+             // This case should ideally not happen if AuthContext handles creation properly
+            setLocalCurrentUser(currentUser); // Fallback to context user
+          }
+        };
+        fetchUserData();
+
         const fetchSubmissions = async () => {
           try {
             const submissionsCol = collection(db, 'submissions');
@@ -73,7 +84,6 @@ export default function ProfilePage() {
 
   const handleAuthSuccess = async (userId) => {
     // AuthContext will update currentUser, which triggers the useEffect above
-    // to fetch user data and submissions.
   };
 
   const handleLogout = async () => {
@@ -93,67 +103,7 @@ export default function ProfilePage() {
     }
   };
 
-  const handleAvatarClick = () => {
-    if (!isUpdatingAvatar) {
-      fileInputRef.current?.click();
-    }
-  };
-
-  const handleAvatarUpdate = async (event) => {
-    const file = event.target.files?.[0];
-    if (file && localCurrentUser && firebaseUser) {
-      setIsUpdatingAvatar(true);
-      toast({ title: 'Uploading Avatar...', description: 'Please wait.' });
-      console.log('[handleAvatarUpdate] Starting avatar upload. File:', file.name, 'Size:', file.size);
-      try {
-        console.log('[handleAvatarUpdate] Entered try block.');
-        
-        const storageRef = ref(storage, `avatars/${firebaseUser.uid}/${file.name}`);
-        console.log('[handleAvatarUpdate] Attempting to upload to Firebase Storage...');
-        await uploadBytes(storageRef, file);
-        console.log('[handleAvatarUpdate] Firebase Storage upload COMPLETE.'); // This log is key
-
-        console.log('[handleAvatarUpdate] Attempting to get download URL...');
-        const newAvatarUrl = await getDownloadURL(storageRef);
-        console.log('[handleAvatarUpdate] Download URL obtained:', newAvatarUrl);
-
-        console.log('[handleAvatarUpdate] Attempting to update Firestore document...');
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        await updateDoc(userDocRef, { avatarUrl: newAvatarUrl });
-        console.log('[handleAvatarUpdate] Firestore document update COMPLETE.');
-
-        setLocalCurrentUser((prevUser) => {
-          if (!prevUser) return null;
-          const updatedUser = { ...prevUser, avatarUrl: newAvatarUrl };
-          console.log('[handleAvatarUpdate] localCurrentUser state updated with new avatarUrl.');
-          return updatedUser;
-        });
-        
-        toast({
-          title: 'Avatar Updated',
-          description: 'Your profile picture has been changed.',
-        });
-        console.log('[handleAvatarUpdate] Avatar update successful, success toast shown.');
-      } catch (error) {
-        console.error('[handleAvatarUpdate] Error during avatar update process:', error);
-        console.error('[handleAvatarUpdate] Firebase error code (if available):', error.code);
-        console.error('[handleAvatarUpdate] Firebase error message (if available):', error.message);
-        toast({
-          title: 'Avatar Update Failed',
-          description: `Could not update your avatar. ${error.message || 'Please try again.'}`,
-          variant: 'destructive',
-        });
-      } finally {
-        console.log('[handleAvatarUpdate] Entered finally block.');
-        setIsUpdatingAvatar(false);
-        console.log('[handleAvatarUpdate] setIsUpdatingAvatar(false) CALLED.');
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ''; 
-        }
-        console.log('[handleAvatarUpdate] Exiting finally block.');
-      }
-    }
-  };
+  // handleAvatarClick and handleAvatarUpdate functions removed as avatar uploads are disabled.
 
   if (pageLoading || authLoading) {
     return (
@@ -211,21 +161,28 @@ export default function ProfilePage() {
 
   return (
     <div className="container mx-auto">
-      <input
+      {/* Removed file input for avatar */}
+      {/* <input
         type="file"
         ref={fileInputRef}
         onChange={handleAvatarUpdate}
         accept="image/*"
         style={{ display: 'none' }}
         disabled={isUpdatingAvatar}
-      />
+      /> */}
 
       <UserProfileCard
         user={localCurrentUser}
-        onAvatarClick={handleAvatarClick}
+        // onAvatarClick prop removed as uploads are disabled
         isOwnProfile={true}
-        isUpdatingAvatar={isUpdatingAvatar}
+        // isUpdatingAvatar prop removed
       />
+       <div className="mt-2 p-4 border border-dashed rounded-md bg-muted/50 text-center">
+            <p className="text-sm text-muted-foreground">
+                Profile picture uploads are currently disabled.
+            </p>
+        </div>
+
 
       <div className="mt-4 text-center sm:text-right">
         <Button variant="outline" onClick={handleLogout}>Logout</Button>
