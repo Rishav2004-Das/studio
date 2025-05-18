@@ -33,7 +33,7 @@ const submissionFormSchema = z.object({
   }).max(500, {
     message: "Caption must not exceed 500 characters.",
   }),
-  file: z.any().optional(),
+  file: z.any().optional(), // z.instanceof(File).optional() might be more specific if needed
 });
 
 
@@ -77,22 +77,21 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
         caption: data.caption,
         fileUrl: fileUrl,
         submittedAt: serverTimestamp(),
-        status: "Pending", 
-        tokensAwarded: 0, 
+        status: "Pending",
+        tokensAwarded: 0,
       };
 
       await addDoc(collection(db, "submissions"), submissionData);
 
       toast({
         title: "Submission Successful!",
-        description: `Your submission for "${taskTitle}" has been received and saved for review.`,
+        description: `Your submission for "${taskTitle}" has been received and saved to the database for review.`,
         variant: "default",
       });
       form.reset();
       setFileToUpload(null);
-      if (document.getElementById('file-input')) {
-        document.getElementById('file-input').value = '';
-      }
+      // The line below attempting to clear by id is removed as id="file-input" is removed.
+      // form.reset() should handle clearing react-hook-form's state for the file input.
     } catch (error) {
       console.error("Submission error:", error);
       toast({
@@ -104,18 +103,6 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
       setIsSubmitting(false);
     }
   }
-
-  const handleFileChange = (event) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setFileToUpload(file);
-      form.setValue("file", file); 
-    } else {
-      setFileToUpload(null);
-      form.setValue("file", undefined);
-    }
-  };
-
 
   if (authLoading) {
     return (
@@ -179,16 +166,22 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
         <FormField
           control={form.control}
           name="file"
-          render={({ field }) => ( 
+          render={({ field: { onChange: onFieldChange, onBlur, name, ref } }) => (
             <FormItem>
               <FormLabel>Upload File (Optional)</FormLabel>
-              <FormControl>
-                <div className="flex items-center space-x-2">
-                  <UploadCloud className="h-5 w-5 text-muted-foreground" />
+              <div className="flex items-center space-x-2">
+                <UploadCloud className="h-5 w-5 text-muted-foreground" />
+                <FormControl>
                   <Input
-                    id="file-input"
                     type="file"
-                    onChange={handleFileChange} 
+                    onBlur={onBlur}
+                    name={name}
+                    ref={ref}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      onFieldChange(file || null); // Update react-hook-form's state
+                      setFileToUpload(file || null); // Update local state for upload
+                    }}
                     className="block w-full text-sm text-slate-500
                       file:mr-4 file:py-2 file:px-4
                       file:rounded-full file:border-0
@@ -197,8 +190,8 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
                       hover:file:bg-primary/20"
                     disabled={isSubmitting}
                   />
-                </div>
-              </FormControl>
+                </FormControl>
+              </div>
               <FormMessage />
             </FormItem>
           )}
