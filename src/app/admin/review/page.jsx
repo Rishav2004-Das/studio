@@ -40,10 +40,10 @@ const statusConfig = {
 
 export default function AdminReviewPage() {
   const [submissions, setSubmissions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setPageIsLoading] = useState(true); // Renamed from isLoading
   const [activeTab, setActiveTab] = useState('Pending');
   const { toast } = useToast();
-  const { currentUser } = useAuth();
+  const { currentUser, isLoading: authContextIsLoading } = useAuth(); // Renamed from isLoading
 
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
@@ -51,29 +51,30 @@ export default function AdminReviewPage() {
   const [tokensToAward, setTokensToAward] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+  const [fetchErrorToastShown, setFetchErrorToastShown] = useState(false);
 
-  const fetchSubmissions = useCallback(async (status) => {
-    setIsLoading(true);
-    setFetchError(null); // Reset error on new fetch
-    setSubmissions([]); // Clear previous submissions
 
+  const fetchSubmissions = useCallback(async (statusToFetch) => {
     if (!currentUser || !currentUser.isAdmin) {
-      console.log('[AdminReviewPage] Current user is not an admin or not available. Aborting fetch.');
-      setFetchError("Access Denied: You must be an admin to view this page. Please ensure your account has 'isAdmin: true' in Firestore.");
-      setIsLoading(false);
-      toast({
-        title: 'Access Denied',
-        description: "You must be an admin to view this page. Check your 'isAdmin' status in Firestore.",
-        variant: 'destructive',
-      });
+      const errorMsg = currentUser ? "Access Denied: User is not an admin." : "Access Denied: No user logged in.";
+      console.warn('[AdminReviewPage] Fetch prevented:', errorMsg);
+      setFetchError(errorMsg);
+      setPageIsLoading(false);
+      setSubmissions([]);
       return;
     }
-    console.log('[AdminReviewPage] Fetching submissions for status:', status, 'as user:', JSON.stringify(currentUser, null, 2));
+
+    console.log('[AdminReviewPage] Fetching submissions for status:', statusToFetch, 'as user:', JSON.stringify(currentUser, null, 2));
+    setPageIsLoading(true);
+    setFetchError(null);
+    setFetchErrorToastShown(false); // Reset toast shown flag for new fetch attempt
+    setSubmissions([]);
+
     try {
       const submissionsCol = collection(db, 'submissions');
-      const q = query(submissionsCol, where('status', '==', status), orderBy('submittedAt', 'desc'));
+      const q = query(submissionsCol, where('status', '==', statusToFetch), orderBy('submittedAt', 'desc'));
       console.log('[AdminReviewPage] Firestore query object:', q);
-      const querySnapshot = await getDocs(q); // This is likely around line 86 where the error originates
+      const querySnapshot = await getDocs(q);
       const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
         const data = docSnapshot.data();
         return {
@@ -83,60 +84,63 @@ export default function AdminReviewPage() {
         };
       });
       setSubmissions(fetchedSubmissions);
-      console.log(`[AdminReviewPage] Successfully fetched ${fetchedSubmissions.length} ${status} submissions.`);
+      console.log(`[AdminReviewPage] Successfully fetched ${fetchedSubmissions.length} ${statusToFetch} submissions.`);
     } catch (error) {
-      console.error(`[AdminReviewPage] Error fetching ${status} submissions (full error object): `, error);
+      console.error(`[AdminReviewPage] Error fetching ${statusToFetch} submissions (full error object): `, error);
       
-      let title = `Error Fetching ${status} Submissions`;
-      let description = `Could not load ${status.toLowerCase()} submissions.`;
+      let title = `Error Fetching ${statusToFetch} Submissions`;
+      let description = `Could not load ${statusToFetch.toLowerCase()} submissions.`;
       let fullErrorMessage = `An unexpected error occurred: ${error.message}. Check the browser console for the full error object.`;
 
       if (error.code === 'permission-denied') {
         title = 'Permission Denied by Firestore Rules';
-        description = `Could not load ${status.toLowerCase()} submissions. This usually means your Firestore security rules are preventing access.`;
+        description = `Could not load ${statusToFetch.toLowerCase()} submissions. This usually means your Firestore security rules are preventing access.`;
         fullErrorMessage = `Error: Permission Denied by Firestore Rules.
         1. Ensure your user account has 'isAdmin: true' (boolean) in its Firestore document.
-        2. Verify your Firestore security rules allow admins to 'list' the 'submissions' collection (check the 'isAdmin()' function and related rules).
-        3. This error can sometimes mask a missing Firestore index if Firebase can't provide a direct link. If admin status and rules are correct, ensure a composite index exists for 'submissions' on 'status' (Ascending) and 'submittedAt' (Descending).
+        2. Verify your Firestore security rules allow admins to 'list' the 'submissions' collection with the current query (filtering by 'status' and ordering by 'submittedAt').
+        3. This error can sometimes mask a missing Firestore index if Firebase can't provide a direct link. If admin status and rules are correct, ensure a composite index exists for 'submissions' on 'status' (e.g., Ascending) and 'submittedAt' (Descending).
         4. Check the browser's developer console for the full Firebase error object.`;
-        setFetchError(fullErrorMessage);
-        toast({ title, description: "See details on the page or in the browser console.", variant: 'destructive', duration: 30000 });
+        // Toasts for these are suppressed to avoid continuous pop-ups for this known issue.
+        // Error is still logged to console and displayed on page via setFetchError.
       } else if (error.code === 'failed-precondition') {
          title = 'Query Requires Index';
-         description = `Could not load ${status.toLowerCase()} submissions because a Firestore index is missing.`;
-         fullErrorMessage = `Error: Query Requires Index. Please check the browser's developer console for a link from Firebase to create the required composite index for querying 'submissions' by 'status' (e.g., Ascending) and ordering by 'submittedAt' (Descending). If no link is provided, you may need to create this index manually in the Firebase console.`;
-         setFetchError(fullErrorMessage);
-         toast({ title, description: "See details on the page or in the browser console.", variant: 'destructive', duration: 30000 });
+         description = `Could not load ${statusToFetch.toLowerCase()} submissions because a Firestore index is missing.`;
+         fullErrorMessage = `Error: Query Requires Index. Please check the browser's developer console for a link from Firebase to create the required composite index for querying 'submissions' by 'status' (e.g., Ascending) and ordering by 'submittedAt' (Descending). If no link is provided, you may need to create this index manually in the Firebase console. The admin query on 'status' and 'submittedAt' requires a different index than the user profile query on 'userId' and 'submittedAt'.`;
+         // Toasts for these are suppressed.
       } else {
          description += " Please try again later or check the browser's developer console for more details.";
          fullErrorMessage = `Error: ${error.message}. Please check the browser console for the full error object.`;
-         setFetchError(fullErrorMessage);
-         toast({ title, description, variant: 'destructive', duration: 10000 });
+         if (!fetchErrorToastShown) {
+            toast({ title, description, variant: 'destructive', duration: 10000 });
+            setFetchErrorToastShown(true);
+         }
       }
+      setFetchError(fullErrorMessage);
     } finally {
-      setIsLoading(false);
+      setPageIsLoading(false);
     }
-  }, [toast, currentUser]); // Removed activeTab from dependencies, as it's passed as 'status' argument
+  }, [currentUser?.uid, currentUser?.isAdmin, toast, fetchErrorToastShown]); // Added fetchErrorToastShown to dependencies, though its role is internal
 
   useEffect(() => {
-    if (currentUser) {
-        if (currentUser.isAdmin) {
+    console.log('[AdminReviewPage] useEffect triggered. activeTab:', activeTab, 'authContextIsLoading:', authContextIsLoading, 'currentUser?.uid:', currentUser?.uid);
+    if (!authContextIsLoading) { // Only act if auth is resolved
+        if (currentUser && currentUser.isAdmin) {
             console.log('[AdminReviewPage] useEffect: User is admin, calling fetchSubmissions for tab:', activeTab);
             fetchSubmissions(activeTab);
         } else {
-            console.warn('[AdminReviewPage] useEffect: User is not admin. Submissions will not be fetched.');
-            setFetchError("Access Denied: You are not authorized to view this page. Your account needs 'isAdmin: true' status in Firestore.");
-            setIsLoading(false);
+            console.warn('[AdminReviewPage] useEffect: User is not admin or not logged in.');
+            const accessDeniedMsg = currentUser ? "Access Denied: You are not authorized to view this page. Your account needs 'isAdmin: true' status in Firestore." : "Access Denied: No user is currently logged in.";
+            setFetchError(accessDeniedMsg);
+            setPageIsLoading(false); // Stop loading for this page
+            setSubmissions([]); // Clear submissions
         }
-    } else if (currentUser === null && !isLoading) { // Explicitly not loading and no user
-        console.log('[AdminReviewPage] useEffect: No user logged in and auth is not loading.');
-        setFetchError("Access Denied: No user is currently logged in.");
-        setIsLoading(false);
     } else {
-        console.log('[AdminReviewPage] useEffect: Current user not available yet or still loading, deferring submission fetch.');
-        // Keep isLoading true until auth resolves
+        console.log('[AdminReviewPage] useEffect: Auth context is still loading. Deferring fetch.');
+        setPageIsLoading(true); // Page should be loading while auth is loading
+        setFetchError(null); // Clear fetch error while auth is resolving
+        setFetchErrorToastShown(false); // Reset toast flag
     }
-  }, [activeTab, fetchSubmissions, currentUser, isLoading]);
+  }, [activeTab, currentUser?.uid, currentUser?.isAdmin, authContextIsLoading, fetchSubmissions]);
 
 
   const handleApproveClick = (submission) => {
@@ -240,7 +244,7 @@ export default function AdminReviewPage() {
         </TabsList>
       </Tabs>
 
-      {isLoading ? (
+      {isPageLoading ? (
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
         </div>
@@ -368,5 +372,3 @@ export default function AdminReviewPage() {
     </div>
   );
 }
-
-    
