@@ -12,11 +12,16 @@ export default function AdminLayout({ children }) {
   const router = useRouter();
 
   useEffect(() => {
+    console.log('[AdminLayout] Auth loading status:', isLoading);
     if (!isLoading) { // Only proceed if auth state is resolved
+      console.log('[AdminLayout] Checking admin status for currentUser:', JSON.stringify(currentUser, null, 2));
       // If currentUser is explicitly null (not loaded yet or logged out)
       // OR if currentUser is loaded but is not an admin
       if (currentUser === null || (currentUser && !currentUser.isAdmin)) {
-        router.replace('/'); 
+        console.log('[AdminLayout] User is not an admin or not logged in. Redirecting to /');
+        router.replace('/');
+      } else {
+        console.log('[AdminLayout] User is an admin. Access granted.');
       }
     }
   }, [currentUser, isLoading, router]);

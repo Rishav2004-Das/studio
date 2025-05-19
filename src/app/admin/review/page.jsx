@@ -30,6 +30,7 @@ import {
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Hourglass, Coins, Link as LinkIcon } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context.jsx'; // Import useAuth
 
 const statusConfig = {
   Pending: { color: "bg-yellow-500 hover:bg-yellow-600", icon: <Hourglass className="mr-2 h-4 w-4" /> },
@@ -42,6 +43,7 @@ export default function AdminReviewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Pending');
   const { toast } = useToast();
+  const { currentUser } = useAuth(); // Get currentUser
 
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
@@ -51,9 +53,11 @@ export default function AdminReviewPage() {
 
   const fetchSubmissions = useCallback(async (status) => {
     setIsLoading(true);
+    console.log('[AdminReviewPage] Fetching submissions for status:', status, 'as user:', JSON.stringify(currentUser, null, 2));
     try {
       const submissionsCol = collection(db, 'submissions');
       const q = query(submissionsCol, where('status', '==', status), orderBy('submittedAt', 'desc'));
+      console.log('[AdminReviewPage] Firestore query object:', q); // Log the query object
       const querySnapshot = await getDocs(q);
       const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
         const data = docSnapshot.data();
@@ -64,31 +68,47 @@ export default function AdminReviewPage() {
         };
       });
       setSubmissions(fetchedSubmissions);
+      console.log(`[AdminReviewPage] Successfully fetched ${fetchedSubmissions.length} ${status} submissions.`);
     } catch (error) {
-      console.error(`Error fetching ${status} submissions (full error object): `, error);
+      console.error(`[AdminReviewPage] Error fetching ${status} submissions (full error object): `, error);
       
       let description = `Could not load ${status.toLowerCase()} submissions.`;
-      if (error.code === 'permission-denied' || error.code === 'failed-precondition') {
-        // Suppress toast for these specific errors as they are handled more passively by showing no data.
-        // Keep the console log for debugging by the developer.
-        console.warn(`Silent fetch error for ${status} submissions: ${error.message}. This might be due to rules or missing indexes. If this persists and the user is an admin, ensure the correct Firestore index (status + submittedAt) exists and security rules allow admin list access.`);
+      if (error.code === 'permission-denied') {
+        description += " This is a Firestore Security Rules issue. Ensure the admin user has 'list' permission for the 'submissions' collection and that the isAdmin() function in your rules is working correctly. Also, double-check if this query requires a specific Firestore index (the browser console might have a link from Firebase to create it if that's the case, although with 'permission-denied' it's more likely a rules issue or the user not being seen as admin by the rules).";
+      } else if (error.code === 'failed-precondition') {
+         description += " This often indicates a missing Firestore index. Please check the browser's developer console for a link from Firebase to create the required composite index for querying 'submissions' by status and ordering by submittedAt.";
       } else {
-         toast({ // Show toast for other unexpected errors
+         description += " Please try again later or check the browser's developer console for more details.";
+      }
+
+      if (error.code !== 'permission-denied' && error.code !== 'failed-precondition') {
+        toast({ 
           title: 'Error Fetching Submissions',
-          description: description + " Please try again later or check the console for more details.",
+          description: description,
           variant: 'destructive',
-          duration: 10000,
+          duration: 15000, 
         });
+      } else {
+        // For permission-denied or failed-precondition, we log to console but don't show the aggressive toast
+        // The page will show "No submissions found" which is less intrusive.
+        console.warn(`[AdminReviewPage] Firestore query for ${status} submissions failed. Error: ${error.message}. Code: ${error.code}`);
       }
       setSubmissions([]); 
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, currentUser]); // Add currentUser to dependency array
 
   useEffect(() => {
-    fetchSubmissions(activeTab);
-  }, [activeTab, fetchSubmissions]);
+    if (currentUser) { // Only fetch if currentUser is available
+        fetchSubmissions(activeTab);
+    } else {
+        console.log('[AdminReviewPage] Current user not available yet, deferring submission fetch.');
+        // Optionally, you could set submissions to [] and isLoading to false here if you don't want to wait
+        // setSubmissions([]);
+        // setIsLoading(false);
+    }
+  }, [activeTab, fetchSubmissions, currentUser]); // Add currentUser to dependency array
 
   const handleApproveClick = (submission) => {
     setSelectedSubmission(submission);
@@ -137,7 +157,7 @@ export default function AdminReviewPage() {
       setTokensToAward(0);
       fetchSubmissions(activeTab); 
     } catch (error) {
-      console.error("Error approving submission: ", error);
+      console.error("[AdminReviewPage] Error approving submission: ", error);
       toast({
         title: 'Approval Failed',
         description: `Could not approve submission. ${error.message}`,
@@ -155,7 +175,7 @@ export default function AdminReviewPage() {
       const submissionRef = doc(db, 'submissions', selectedSubmission.id);
       await updateDoc(submissionRef, {
         status: 'Rejected',
-        tokensAwarded: 0, // Ensure tokensAwarded is 0 on rejection
+        tokensAwarded: 0, 
         reviewedAt: serverTimestamp(),
       });
       toast({
@@ -166,7 +186,7 @@ export default function AdminReviewPage() {
       setSelectedSubmission(null);
       fetchSubmissions(activeTab); 
     } catch (error) {
-      console.error("Error rejecting submission: ", error);
+      console.error("[AdminReviewPage] Error rejecting submission: ", error);
       toast({
         title: 'Rejection Failed',
         description: `Could not reject submission. ${error.message}`,
@@ -200,7 +220,7 @@ export default function AdminReviewPage() {
         <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
           <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-lg font-semibold text-muted-foreground">No {activeTab.toLowerCase()} submissions found.</p>
-          <p className="text-sm text-muted-foreground">Check back later or select a different status tab. If you are an admin and expect to see submissions but see a console error about permissions, ensure your Firestore security rules and indexes (for 'status' and 'submittedAt' fields on the 'submissions' collection) are correctly configured for admin access.</p>
+          <p className="text-sm text-muted-foreground">Check back later or select a different status tab. If you are an admin and seeing a permission error in the console, ensure your Firestore security rules allow admin listing and that the correct Firestore index (for 'status' and 'submittedAt' on 'submissions') exists and is enabled.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border shadow-md">
