@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/alert-dialog.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
-import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Hourglass, Coins, Link as LinkIcon, ServerCrash } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Hourglass, Coins, ServerCrash } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context.jsx';
 
 const statusConfig = {
@@ -40,10 +40,10 @@ const statusConfig = {
 
 export default function AdminReviewPage() {
   const [submissions, setSubmissions] = useState([]);
-  const [isPageLoading, setPageIsLoading] = useState(true); // Renamed from isLoading
+  const [isPageLoading, setPageIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Pending');
   const { toast } = useToast();
-  const { currentUser, isLoading: authContextIsLoading } = useAuth(); // Renamed from isLoading
+  const { currentUser, isLoading: authContextIsLoading } = useAuth();
 
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
@@ -67,7 +67,7 @@ export default function AdminReviewPage() {
     console.log('[AdminReviewPage] Fetching submissions for status:', statusToFetch, 'as user:', JSON.stringify(currentUser, null, 2));
     setPageIsLoading(true);
     setFetchError(null);
-    setFetchErrorToastShown(false); // Reset toast shown flag for new fetch attempt
+    // Do not reset fetchErrorToastShown here, let it reset per error instance.
     setSubmissions([]);
 
     try {
@@ -81,6 +81,7 @@ export default function AdminReviewPage() {
           id: docSnapshot.id,
           ...data,
           submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : new Date(data.submittedAt || Date.now()),
+          originalTaskTokens: data.originalTaskTokens || 0, // Ensure this field exists
         };
       });
       setSubmissions(fetchedSubmissions);
@@ -94,19 +95,24 @@ export default function AdminReviewPage() {
 
       if (error.code === 'permission-denied') {
         title = 'Permission Denied by Firestore Rules';
-        description = `Could not load ${statusToFetch.toLowerCase()} submissions. This usually means your Firestore security rules are preventing access.`;
+        description = `Could not load ${statusToFetch.toLowerCase()} submissions. Your account might lack admin rights in Firestore, or security rules are misconfigured.`;
         fullErrorMessage = `Error: Permission Denied by Firestore Rules.
         1. Ensure your user account has 'isAdmin: true' (boolean) in its Firestore document.
         2. Verify your Firestore security rules allow admins to 'list' the 'submissions' collection with the current query (filtering by 'status' and ordering by 'submittedAt').
         3. This error can sometimes mask a missing Firestore index if Firebase can't provide a direct link. If admin status and rules are correct, ensure a composite index exists for 'submissions' on 'status' (e.g., Ascending) and 'submittedAt' (Descending).
-        4. Check the browser's developer console for the full Firebase error object.`;
-        // Toasts for these are suppressed to avoid continuous pop-ups for this known issue.
-        // Error is still logged to console and displayed on page via setFetchError.
+        4. Check the browser's developer console for the full Firebase error object for more clues.`;
+         if (!fetchErrorToastShown) {
+           // toast({ title, description, variant: 'destructive', duration: 10000 });
+           // setFetchErrorToastShown(true);
+         }
       } else if (error.code === 'failed-precondition') {
          title = 'Query Requires Index';
          description = `Could not load ${statusToFetch.toLowerCase()} submissions because a Firestore index is missing.`;
-         fullErrorMessage = `Error: Query Requires Index. Please check the browser's developer console for a link from Firebase to create the required composite index for querying 'submissions' by 'status' (e.g., Ascending) and ordering by 'submittedAt' (Descending). If no link is provided, you may need to create this index manually in the Firebase console. The admin query on 'status' and 'submittedAt' requires a different index than the user profile query on 'userId' and 'submittedAt'.`;
-         // Toasts for these are suppressed.
+         fullErrorMessage = `Error: Query Requires Index. Please check the browser's developer console for a link from Firebase to create the required composite index for querying 'submissions' by 'status' (e.g., Ascending) and ordering by 'submittedAt' (Descending). The admin query on 'status' and 'submittedAt' requires this index. If no link is provided, create it manually.`;
+          if (!fetchErrorToastShown) {
+            // toast({ title, description, variant: 'destructive', duration: 10000 });
+            // setFetchErrorToastShown(true);
+          }
       } else {
          description += " Please try again later or check the browser's developer console for more details.";
          fullErrorMessage = `Error: ${error.message}. Please check the browser console for the full error object.`;
@@ -119,28 +125,35 @@ export default function AdminReviewPage() {
     } finally {
       setPageIsLoading(false);
     }
-  }, [currentUser?.uid, currentUser?.isAdmin, toast, fetchErrorToastShown]); // Added fetchErrorToastShown to dependencies, though its role is internal
+  }, [currentUser, toast, fetchErrorToastShown]); // Removed currentUser?.uid and currentUser?.isAdmin as currentUser covers it.
 
   useEffect(() => {
-    console.log('[AdminReviewPage] useEffect triggered. activeTab:', activeTab, 'authContextIsLoading:', authContextIsLoading, 'currentUser?.uid:', currentUser?.uid);
-    if (!authContextIsLoading) { // Only act if auth is resolved
-        if (currentUser && currentUser.isAdmin) {
+    console.log('[AdminReviewPage] useEffect triggered. activeTab:', activeTab, 'authContextIsLoading:', authContextIsLoading, 'currentUser:', JSON.stringify(currentUser, null, 2));
+    if (!authContextIsLoading) {
+        if (currentUser && currentUser.isAdmin === true) { // Explicitly check for boolean true
             console.log('[AdminReviewPage] useEffect: User is admin, calling fetchSubmissions for tab:', activeTab);
+            setFetchErrorToastShown(false); // Reset toast shown flag for new fetch/tab change
             fetchSubmissions(activeTab);
-        } else {
-            console.warn('[AdminReviewPage] useEffect: User is not admin or not logged in.');
-            const accessDeniedMsg = currentUser ? "Access Denied: You are not authorized to view this page. Your account needs 'isAdmin: true' status in Firestore." : "Access Denied: No user is currently logged in.";
+        } else if (currentUser && currentUser.isAdmin !== true) { // User exists but is not admin
+            console.warn('[AdminReviewPage] useEffect: User is not an admin.');
+            const accessDeniedMsg = "Access Denied: You are not authorized to view this page. Your account needs 'isAdmin: true' status in Firestore.";
             setFetchError(accessDeniedMsg);
-            setPageIsLoading(false); // Stop loading for this page
-            setSubmissions([]); // Clear submissions
+            setPageIsLoading(false);
+            setSubmissions([]);
+        } else { // No current user
+             console.warn('[AdminReviewPage] useEffect: No user logged in.');
+             const noUserMsg = "Access Denied: No user is currently logged in. Please log in with an admin account.";
+             setFetchError(noUserMsg);
+             setPageIsLoading(false);
+             setSubmissions([]);
         }
     } else {
         console.log('[AdminReviewPage] useEffect: Auth context is still loading. Deferring fetch.');
-        setPageIsLoading(true); // Page should be loading while auth is loading
-        setFetchError(null); // Clear fetch error while auth is resolving
-        setFetchErrorToastShown(false); // Reset toast flag
+        setPageIsLoading(true);
+        setFetchError(null);
+        setFetchErrorToastShown(false);
     }
-  }, [activeTab, currentUser?.uid, currentUser?.isAdmin, authContextIsLoading, fetchSubmissions]);
+  }, [activeTab, currentUser, authContextIsLoading, fetchSubmissions]);
 
 
   const handleApproveClick = (submission) => {
