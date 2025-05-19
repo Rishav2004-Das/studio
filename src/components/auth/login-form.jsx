@@ -45,20 +45,20 @@ export function LoginForm({ onLoginSuccess, switchToSignup }) {
         title: 'Login Successful!',
         description: 'Welcome back!',
       });
-      onLoginSuccess(userCredential.user.uid); // AuthContext will handle state update
+      if (onLoginSuccess) {
+        onLoginSuccess(userCredential.user.uid);
+      }
       form.reset();
     } catch (error) {
+      console.error('[LoginForm] Full login error object:', error);
       let errorMessage = 'Login failed. Please check your credentials.';
-      // Check for specific Firebase error codes
+      
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         errorMessage = 'Invalid email or password.';
-        // Don't log this expected error to the console
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Please enter a valid email address.';
-        // Don't log this expected error to the console
-      } else {
-        // Log other unexpected errors
-        console.error('Login error:', error);
+      } else if (error.name === 'FirebaseError') { // Catch more generic Firebase errors
+        errorMessage = `Login failed: ${error.message} (Code: ${error.code || 'N/A'}). Please check your API key and Firebase project setup. See console for details.`;
       }
       
       toast({

@@ -72,32 +72,32 @@ export function SignupForm({ onSignupSuccess, switchToLogin }) {
 
       toast({
         title: 'Signup Successful!',
-        description: `Welcome, ${data.name}!`, // Updated message
+        description: `Welcome, ${data.name}!`,
       });
       
-      onSignupSuccess(firebaseUser.uid);
-      // No longer automatically switching to login after signup, AuthContext will handle it.
-      // switchToLogin(); 
+      if (onSignupSuccess) {
+        onSignupSuccess(firebaseUser.uid);
+      }
       form.reset();
 
     } catch (error) {
-      let errorMessage = 'Signup failed. Please try again.';
       console.error('[SignupForm] Full signup error object:', error); 
+      let errorMessage = 'Signup failed. Please try again.';
 
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'This email is already registered. Please log in or use a different email.';
         if (switchToLogin) {
-            // switchToLogin(); // Commented out as per original logic, but kept if needed
+            switchToLogin();
         }
       } else if (error.code === 'auth/weak-password') {
         errorMessage = 'The password is too weak. Please choose a stronger password.';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Please enter a valid email address.';
       } else if (error.name === 'FirebaseError' && error.message && error.message.includes('Missing or insufficient permissions')) {
-        errorMessage = 'Signup partially failed: Could not create user profile data. Please check Firestore rules and ensure the "users" collection allows creates for new users with "isAdmin: false".';
+        errorMessage = 'Signup partially failed: Could not create user profile data due to database permissions. Please contact support or check Firestore rules.';
          console.error('[SignupForm] Firestore permission error during setDoc:', error.code, error.message);
-      } else if (error.name === 'FirebaseError') {
-        errorMessage = `Signup failed due to a Firebase error: ${error.message} (Code: ${error.code || 'N/A'}). Please check console for details.`;
+      } else if (error.name === 'FirebaseError') { // Catch more generic Firebase errors, including potential API key issues
+        errorMessage = `Signup failed: ${error.message} (Code: ${error.code || 'N/A'}). Please check your API key and Firebase project setup. See console for details.`;
       }
       
       toast({
