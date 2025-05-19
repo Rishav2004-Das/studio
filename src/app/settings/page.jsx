@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTheme } from '@/hooks/use-theme.js'; 
-import { Button, buttonVariants } from '@/components/ui/button.jsx'; 
+import { useTheme } from '@/hooks/use-theme.js';
+import { Button, buttonVariants } from '@/components/ui/button.jsx';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { Switch } from '@/components/ui/switch.jsx';
@@ -106,7 +106,26 @@ export default function SettingsPage() {
 
         // Delete user data from Firestore
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        await deleteDoc(userDocRef);
+        try {
+          await deleteDoc(userDocRef);
+        } catch (firestoreError) {
+          console.error("Error deleting user document from Firestore: ", firestoreError);
+          let firestoreErrorDesc = "Could not delete your user data from our records.";
+          if (firestoreError.code === 'permission-denied') {
+            firestoreErrorDesc = "Could not delete user data: Permission denied. Please check Firestore security rules to allow users to delete their own document in the 'users' collection.";
+          }
+          toast({
+            title: 'Data Deletion Failed',
+            description: firestoreErrorDesc,
+            variant: 'destructive',
+            duration: 9000,
+          });
+          // We might still proceed to delete the auth user, or stop here.
+          // For now, let's stop if Firestore deletion fails, as it's part of the process.
+          setIsDeleteAccountLoading(false);
+          return;
+        }
+        
 
         // Delete user from Firebase Auth
         await deleteFirebaseUser(firebaseUser);
@@ -124,7 +143,11 @@ export default function SettingsPage() {
             setPasswordForDelete(''); // Clear password if it was wrong
         } else if (error.code === 'auth/requires-recent-login') {
             desc = "This operation is sensitive and requires recent authentication. Please log out and log back in before trying again.";
-        } else {
+        } else if (error.code === 'permission-denied' && error.message.includes('firestore')) {
+            // This specific check might be redundant if caught by the inner try-catch, but good for general auth errors
+             desc = "Could not delete user data due to Firestore permissions. Please check security rules.";
+        }
+        else {
             // Log only unexpected errors
             console.error("Error deleting account: ", error);
         }
@@ -355,18 +378,18 @@ export default function SettingsPage() {
                       {isDeleteDialogPasswordEmpty && <p className="text-xs text-destructive mt-1">Password is required to delete account.</p>}
                     </div>
                     <AlertDialogFooter>
-                      <AlertDialogCancel 
+                      <AlertDialogCancel
                         onClick={() => {
-                          setPasswordForDelete(''); 
+                          setPasswordForDelete('');
                           setIsDeleteDialogPasswordEmpty(false);
-                        }} 
+                        }}
                         disabled={isDeleteAccountLoading}
                       >
                         Cancel
                       </AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={handleDeleteAccount} 
-                        className={buttonVariants({ variant: "destructive" })} 
+                      <AlertDialogAction
+                        onClick={handleDeleteAccount}
+                        className={buttonVariants({ variant: "destructive" })}
                         disabled={isDeleteAccountLoading}
                       >
                         {isDeleteAccountLoading ? "Deleting..." : "Yes, delete account"}
@@ -399,3 +422,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
