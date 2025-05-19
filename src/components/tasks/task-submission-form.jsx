@@ -23,16 +23,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton.jsx";
 import { useState } from "react";
 import { db } from '@/lib/firebase/config.js';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, runTransaction } from 'firebase/firestore';
 
-// Schema for task submission, fileLink is now optional
+// Schema for task submission
 const submissionFormSchema = z.object({
   caption: z.string().min(10, {
     message: "Caption must be at least 10 characters.",
   }).max(500, {
     message: "Caption must not exceed 500 characters.",
   }),
-  fileLink: z.string().url({ message: "Please enter a valid URL for the file link." }).optional().or(z.literal('')),
+  fileLink: z.string().url({ message: "A valid link to your submission file is required." }).min(1, { message: "File link cannot be empty." }),
 });
 
 
@@ -50,24 +50,25 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
   });
 
   async function onSubmit(data) {
-    if (!currentUser || !currentUser.id) {
-      toast({ title: "Error", description: "User not found. Please log in.", variant: "destructive" });
-      setIsSubmitting(false); // Ensure loading state is reset
-      return;
-    }
     setIsSubmitting(true);
     console.log("[TaskSubmission] Form data submitted:", data);
 
+    if (!currentUser || !currentUser.id) {
+      toast({ title: "Authentication Error", description: "Could not verify user. Please log in again.", variant: "destructive" });
+      setIsSubmitting(false);
+      return;
+    }
+    
     const submissionData = {
       userId: currentUser.id,
-      submitterName: currentUser.name || "Anonymous User", // Fallback for name
+      submitterName: currentUser.name || "Anonymous User",
       taskId: taskId,
       taskTitle: taskTitle,
       originalTaskTokens: Number(taskTokens) || 0,
       caption: data.caption,
-      fileLink: data.fileLink || null, // Store the link or null if empty
+      fileLink: data.fileLink, // Will be a valid URL due to Zod validation
       submittedAt: serverTimestamp(),
-      status: "Pending",
+      status: "Pending", // Submissions are pending admin review
       tokensAwarded: 0,
     };
 
@@ -88,7 +89,7 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
       let description = "Could not submit your task. Please try again.";
       
       if (error.name === 'FirebaseError') {
-        description = `Submission to database failed: ${error.message} (Code: ${error.code || 'N/A'}). Please check your Firestore security rules for the 'submissions' collection.`;
+        description = `Submission to database failed: ${error.message} (Code: ${error.code || 'N/A'}). Please check your Firestore security rules for the 'submissions' collection or your internet connection.`;
       } else if (error instanceof z.ZodError) {
         description = "Invalid submission data. Please check the form fields.";
       }
@@ -104,6 +105,7 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
       setIsSubmitting(false);
     }
   }
+
 
   if (authLoading) {
     return (
@@ -185,7 +187,7 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
               </FormControl>
               <FormMessage />
                <p className="text-xs text-muted-foreground mt-1">
-                If your task involves a file, upload it to a service like Google Drive, Dropbox, Imgur, etc., and paste the shareable link here.
+                Upload your task file to a service like Google Drive, Dropbox, Imgur, etc., and paste the shareable link here.
               </p>
             </FormItem>
           )}
