@@ -22,24 +22,26 @@ const nextConfig = {
     return [
       {
         // Apply these headers to all static assets served from _next/static
+        // This includes fonts, CSS, JS chunks, etc.
         source: '/_next/static/(.*)',
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: '*', // Allows all origins. For production, you might restrict this.
+            value: '*', // Allows all origins. For production, restrict to your domain.
           },
           {
             key: 'Access-Control-Allow-Methods',
-            value: 'GET,OPTIONS',
+            value: 'GET,OPTIONS', // Methods Next.js uses for static assets
           },
           {
             key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type',
+            value: 'Content-Type', // A common safe header
           },
         ],
       },
       {
-        // Apply to all other paths if needed, though less likely to affect static font loading by the page itself.
+        // More general rule for other paths if needed, though less likely
+        // to affect static asset loading by the page itself.
         source: '/:path*',
         headers: [
           {
