@@ -40,9 +40,22 @@ export function AuthProvider({ children }) {
               isAdmin: false, // Explicitly set isAdmin to false for new users
             };
             console.log('[AuthContext] New user data to be set:', newUser);
-            await setDoc(userDocRef, newUser);
-            console.log('[AuthContext] New user document created successfully.');
-            setCurrentUser(newUser);
+            try {
+              await setDoc(userDocRef, newUser);
+              console.log('[AuthContext] New user document created successfully.');
+              setCurrentUser(newUser);
+            } catch (setDocError) {
+              console.error(
+                "[AuthContext] CRITICAL: Failed to create new user document in Firestore for user:",
+                user.uid,
+                "Data attempted:", newUser,
+                "Error:", setDocError
+              );
+              console.error(
+                "[AuthContext] PLEASE CHECK YOUR FIRESTORE SECURITY RULES for the 'users' collection, specifically the 'create' permission. Ensure it allows writing documents with 'isAdmin: false' or with 'isAdmin' not present."
+              );
+              // setCurrentUser(null); // Keep user as null if Firestore doc creation fails
+            }
           }
         } else {
           console.log('[AuthContext] No authenticated user.');
@@ -51,18 +64,15 @@ export function AuthProvider({ children }) {
         }
       } catch (error) {
         console.error("[AuthContext] Error processing auth state change or fetching/setting user doc:", error);
-        // Log the full error object for more details
         console.error("[AuthContext] Full Firebase error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
         setCurrentUser(null);
         setFirebaseUser(null);
       } finally {
-        // console.log('[AuthContext] Setting isLoading to false.');
         setIsLoading(false);
       }
     });
 
     return () => {
-      // console.log('[AuthContext] Unsubscribing from onAuthStateChanged.');
       unsubscribe();
     };
   }, []);
