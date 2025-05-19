@@ -48,13 +48,15 @@ export function SignupForm({ onSignupSuccess, switchToLogin }) {
   async function onSubmit(data) {
     setIsLoading(true);
     try {
+      console.log('[SignupForm] Attempting to create user in Firebase Auth...');
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const firebaseUser = userCredential.user;
+      console.log('[SignupForm] Firebase Auth user created successfully:', firebaseUser.uid);
 
-      // Update Firebase Auth profile
+      console.log('[SignupForm] Attempting to update Firebase Auth profile...');
       await updateProfile(firebaseUser, { displayName: data.name });
+      console.log('[SignupForm] Firebase Auth profile updated.');
 
-      // Create user document in Firestore
       const newUserDoc = {
         id: firebaseUser.uid,
         name: data.name,
@@ -62,36 +64,37 @@ export function SignupForm({ onSignupSuccess, switchToLogin }) {
         avatarUrl: null,
         tokenBalance: 0,
         createdAt: serverTimestamp(),
+        isAdmin: false, // Explicitly set isAdmin to false for new users
       };
+      console.log('[SignupForm] Attempting to create Firestore document for new user with data:', newUserDoc);
       await setDoc(doc(db, 'users', firebaseUser.uid), newUserDoc);
+      console.log('[SignupForm] Firestore document created successfully.');
 
       toast({
         title: 'Signup Successful!',
         description: `Welcome, ${data.name}! Please log in.`,
       });
       
-      onSignupSuccess(firebaseUser.uid); // Notify parent, AuthContext will handle state
-      switchToLogin(); // Switch to login form after successful signup
+      onSignupSuccess(firebaseUser.uid);
+      switchToLogin(); 
       form.reset();
 
     } catch (error) {
       let errorMessage = 'Signup failed. Please try again.';
+      console.error('[SignupForm] Full signup error object:', error); // Log the full error object
+
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'This email is already registered. Please log in or use a different email.';
-        // This is an expected error, so we don't need to log it as a critical console error.
-        // The toast and form switch are sufficient handling.
         if (switchToLogin) {
             switchToLogin();
         }
       } else if (error.code === 'auth/weak-password') {
         errorMessage = 'The password is too weak. Please choose a stronger password.';
-        console.error('Signup error (weak-password):', error);
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Please enter a valid email address.';
-        console.error('Signup error (invalid-email):', error);
-      } else {
-        // Log other unexpected errors
-        console.error('Signup error:', error);
+      } else if (error.name === 'FirebaseError' && error.message.includes('Missing or insufficient permissions')) {
+        errorMessage = 'Signup partially failed: Could not create user profile data. Please check Firestore rules.';
+         console.error('[SignupForm] Firestore permission error during setDoc:', error.code, error.message);
       }
       
       toast({
