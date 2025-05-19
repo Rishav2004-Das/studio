@@ -16,24 +16,23 @@ import {
 import { Input } from "@/components/ui/input.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { useToast } from "@/hooks/use-toast.js";
-import { Send, LogIn, Paperclip, Info } from "lucide-react";
+import { Send, LogIn, Link as LinkIcon } from "lucide-react"; // Changed Paperclip to LinkIcon
 import { useAuth } from "@/contexts/auth-context.jsx";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.jsx";
 import { Skeleton } from "@/components/ui/skeleton.jsx";
-import { useState, useRef } from "react";
-import { db, storage } from '@/lib/firebase/config.js';
+import { useState } from "react";
+import { db } from '@/lib/firebase/config.js';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Schema for task submission, file is now optional client-side
+// Schema for task submission, fileLink is now optional
 const submissionFormSchema = z.object({
   caption: z.string().min(10, {
     message: "Caption must be at least 10 characters.",
   }).max(500, {
     message: "Caption must not exceed 500 characters.",
   }),
-  file: z.instanceof(File).optional().nullable(), // Allow File, undefined, or null
+  fileLink: z.string().url({ message: "Please enter a valid URL for the file link." }).optional().or(z.literal('')),
 });
 
 
@@ -41,14 +40,12 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [fileToUpload, setFileToUpload] = useState(null);
-  const fileInputRef = useRef(null); // To reset file input
 
   const form = useForm({
     resolver: zodResolver(submissionFormSchema),
     defaultValues: {
       caption: "",
-      file: null,
+      fileLink: "",
     },
   });
 
@@ -59,41 +56,19 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
     }
     setIsSubmitting(true);
     console.log("[TaskSubmission] Form data submitted:", data);
-    console.log("[TaskSubmission] File to upload state:", fileToUpload);
-
-    let fileUrl = null;
-    let uploadedFileName = null;
 
     try {
-      console.log("[TaskSubmission] Entered try block.");
-      if (fileToUpload) {
-        console.log(`[TaskSubmission] File selected: ${fileToUpload.name}, Size: ${fileToUpload.size}`);
-        const storageRef = ref(storage, `submissions/${currentUser.id}/${taskId}/${fileToUpload.name}`);
-        
-        console.log("[TaskSubmission] Attempting to upload to Firebase Storage...");
-        await uploadBytes(storageRef, fileToUpload);
-        console.log("[TaskSubmission] Firebase Storage upload COMPLETE.");
-
-        console.log("[TaskSubmission] Attempting to get download URL...");
-        fileUrl = await getDownloadURL(storageRef);
-        console.log("[TaskSubmission] Download URL obtained:", fileUrl);
-        uploadedFileName = fileToUpload.name;
-      } else {
-        console.log("[TaskSubmission] No file selected for upload.");
-      }
-
       const submissionData = {
         userId: currentUser.id,
         submitterName: currentUser.name || "Unknown User",
         taskId: taskId,
         taskTitle: taskTitle,
-        originalTaskTokens: taskTokens || 0,
+        originalTaskTokens: Number(taskTokens) || 0,
         caption: data.caption,
-        fileUrl: fileUrl,
-        fileName: uploadedFileName, // Store the file name if uploaded
+        fileLink: data.fileLink || null, // Store the link or null
         submittedAt: serverTimestamp(),
-        status: "Pending",
-        tokensAwarded: 0,
+        status: "Pending", // Submissions are now pending admin review
+        tokensAwarded: 0,   // HTR awarded by admin
       };
 
       console.log("[TaskSubmission] Attempting to add submission to Firestore:", submissionData);
@@ -102,29 +77,19 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
 
       toast({
         title: "Submission Successful!",
-        description: `Your submission for "${taskTitle}" has been received. ${fileToUpload ? 'File uploaded.' : 'No file was uploaded.'}`,
+        description: `Your submission for "${taskTitle}" has been received for review.`,
         variant: "default",
         duration: 7000,
       });
       form.reset();
-      setFileToUpload(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""; // Reset file input visually
-      }
     } catch (error) {
       console.error("[TaskSubmission] Full submission error object:", error);
       let description = "Could not submit your task. Please try again.";
       
       if (error.name === 'FirebaseError') {
         description = `Submission failed: ${error.message} (Code: ${error.code || 'N/A'}).`;
-        if (error.code === 'storage/unauthorized') {
-            description = `File upload failed: You do not have permission to upload to this location. Please check Firebase Storage rules. (Code: ${error.code})`;
-        } else if (error.code === 'storage/object-not-found' || error.code === 'storage/bucket-not-found') {
-            description = `File upload failed: Storage path or bucket not found. Please check your Firebase Storage setup. (Code: ${error.code})`;
-        } else if (error.code === 'permission-denied') { // Firestore permission denied
+        if (error.code === 'permission-denied') { 
             description = `Submission to database failed: Permission denied. Please check your Firestore security rules for the 'submissions' collection. (Code: ${error.code})`;
-        } else if (error.code && error.code.includes('cors')) {
-            description = "File upload failed due to a CORS (Cross-Origin Resource Sharing) issue. This often requires configuration on your Firebase Storage bucket. Check browser console for more details.";
         }
       } else if (error instanceof z.ZodError) {
         description = "Invalid submission data. Please check the form fields.";
@@ -167,7 +132,7 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
         </CardHeader>
         <CardContent>
           <p className="mb-4 text-sm text-muted-foreground">
-            Please log in or create an account to participate and earn tokens.
+            Please log in or create an account to participate and earn HTR.
           </p>
           <Button asChild className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
             <Link href="/profile">
@@ -190,7 +155,7 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
               <FormLabel>Caption / Details</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Provide details about your submission, links, or any relevant information."
+                  placeholder="Provide details about your submission, or any relevant information."
                   className="min-h-[120px] resize-y"
                   {...field}
                   disabled={isSubmitting}
@@ -203,35 +168,33 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
 
         <FormField
           control={form.control}
-          name="file"
-          render={({ field: { onChange, value, ...restField } }) => (
+          name="fileLink"
+          render={({ field }) => (
             <FormItem>
-              <FormLabel htmlFor="file-input" className="flex items-center">
-                <Paperclip className="mr-2 h-4 w-4" />
-                Attach File (Optional)
+              <FormLabel htmlFor="file-link-input" className="flex items-center">
+                <LinkIcon className="mr-2 h-4 w-4" />
+                Link to your submission file (Optional)
               </FormLabel>
               <FormControl>
                 <Input
-                  id="file-input"
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    onChange(file || null); // Pass file or null to react-hook-form
-                    setFileToUpload(file || null);
-                  }}
-                  {...restField}
-                  className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-full file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-primary/20"
+                  id="file-link-input"
+                  type="url"
+                  placeholder="https://your-file-host.com/your-file"
+                  {...field}
+                  className="block w-full text-sm text-muted-foreground"
                   disabled={isSubmitting}
                 />
               </FormControl>
               <FormMessage />
+               <p className="text-xs text-muted-foreground mt-1">
+                Upload your file to a service like Google Drive, Dropbox, Imgur, etc., and paste the shareable link here.
+              </p>
             </FormItem>
           )}
         />
 
         <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
-          {isSubmitting ? (fileToUpload ? "Uploading & Submitting..." : "Submitting...") : <><Send className="mr-2 h-4 w-4" /> Submit Task</>}
+          {isSubmitting ? "Submitting..." : <><Send className="mr-2 h-4 w-4" /> Submit Task for Review</>}
         </Button>
       </form>
     </Form>

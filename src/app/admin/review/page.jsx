@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/alert-dialog.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
-import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Hourglass, Coins } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Hourglass, Coins, Link as LinkIcon } from 'lucide-react';
 
 const statusConfig = {
   Pending: { color: "bg-yellow-500 hover:bg-yellow-600", icon: <Hourglass className="mr-2 h-4 w-4" /> },
@@ -53,7 +53,6 @@ export default function AdminReviewPage() {
     setIsLoading(true);
     try {
       const submissionsCol = collection(db, 'submissions');
-      // Query for admin review page needs to filter by status and order by submittedAt
       const q = query(submissionsCol, where('status', '==', status), orderBy('submittedAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
@@ -69,31 +68,14 @@ export default function AdminReviewPage() {
       console.error(`Error fetching ${status} submissions (full error object): `, error);
       
       let description = `Could not load ${status.toLowerCase()} submissions.`;
-      if (error.code === 'permission-denied') {
-        description += " Permission denied. Ensure Firestore security rules allow admin access and check browser console for index creation links if this is the first time for this query.";
-      } else if (error.code === 'failed-precondition') {
-        description += " This query may require a composite index. Please check the browser's developer console for a link to create the missing index in Firestore.";
-      } else {
-        description += " Please try again later.";
-      }
-      
-      // Suppress toast for certain errors to avoid being too intrusive
       if (error.code === 'permission-denied' || error.code === 'failed-precondition') {
-        // Log to console for developer awareness, but don't show UI toast unless necessary
-        console.warn(`Silent fetch error for ${status} submissions: ${error.message}. This might be due to rules or missing indexes. Check developer console for details.`);
-         // Only show toast if submissions are empty, indicating a real blockage
-        if (submissions.length === 0) {
-           toast({
-            title: `Error Fetching ${status} Submissions`,
-            description: description,
-            variant: 'destructive',
-            duration: 15000, // Longer duration for important messages
-          });
-        }
+        // Suppress toast for these specific errors as they are handled more passively by showing no data.
+        // Keep the console log for debugging by the developer.
+        console.warn(`Silent fetch error for ${status} submissions: ${error.message}. This might be due to rules or missing indexes. If this persists and the user is an admin, ensure the correct Firestore index (status + submittedAt) exists and security rules allow admin list access.`);
       } else {
-        toast({
+         toast({ // Show toast for other unexpected errors
           title: 'Error Fetching Submissions',
-          description: description,
+          description: description + " Please try again later or check the console for more details.",
           variant: 'destructive',
           duration: 10000,
         });
@@ -102,7 +84,7 @@ export default function AdminReviewPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, submissions.length]); // Added submissions.length to re-evaluate toast logic
+  }, [toast]);
 
   useEffect(() => {
     fetchSubmissions(activeTab);
@@ -126,10 +108,10 @@ export default function AdminReviewPage() {
     }
     setIsProcessing(true);
     try {
-      await runTransaction(db, async (transaction) => {
-        const submissionRef = doc(db, 'submissions', selectedSubmission.id);
-        const userRef = doc(db, 'users', selectedSubmission.userId);
+      const submissionRef = doc(db, 'submissions', selectedSubmission.id);
+      const userRef = doc(db, 'users', selectedSubmission.userId);
 
+      await runTransaction(db, async (transaction) => {
         const userSnap = await transaction.get(userRef);
         if (!userSnap.exists()) {
           throw new Error(`User document ${selectedSubmission.userId} not found.`);
@@ -173,7 +155,7 @@ export default function AdminReviewPage() {
       const submissionRef = doc(db, 'submissions', selectedSubmission.id);
       await updateDoc(submissionRef, {
         status: 'Rejected',
-        tokensAwarded: 0,
+        tokensAwarded: 0, // Ensure tokensAwarded is 0 on rejection
         reviewedAt: serverTimestamp(),
       });
       toast({
@@ -218,7 +200,7 @@ export default function AdminReviewPage() {
         <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
           <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-lg font-semibold text-muted-foreground">No {activeTab.toLowerCase()} submissions found.</p>
-          <p className="text-sm text-muted-foreground">Check back later or select a different status tab.</p>
+          <p className="text-sm text-muted-foreground">Check back later or select a different status tab. If you are an admin and expect to see submissions but see a console error about permissions, ensure your Firestore security rules and indexes (for 'status' and 'submittedAt' fields on the 'submissions' collection) are correctly configured for admin access.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border shadow-md">
@@ -229,7 +211,7 @@ export default function AdminReviewPage() {
                 <TableHead>Submitted By</TableHead>
                 <TableHead>Submitted At</TableHead>
                 <TableHead>Caption</TableHead>
-                <TableHead>File</TableHead>
+                <TableHead>File Link</TableHead>
                 {activeTab === 'Approved' && <TableHead className="text-right">HTR Awarded</TableHead>}
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
@@ -242,14 +224,14 @@ export default function AdminReviewPage() {
                   <TableCell>{new Date(submission.submittedAt).toLocaleDateString()}</TableCell>
                   <TableCell className="max-w-xs truncate">{submission.caption}</TableCell>
                   <TableCell>
-                    {submission.fileUrl ? (
+                    {submission.fileLink ? (
                       <Button variant="link" asChild size="sm">
-                        <a href={submission.fileUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={submission.fileLink} target="_blank" rel="noopener noreferrer">
                           View File <ExternalLink className="ml-1 h-3 w-3" />
                         </a>
                       </Button>
                     ) : (
-                      <span className="text-xs text-muted-foreground">No file</span>
+                      <span className="text-xs text-muted-foreground">No link</span>
                     )}
                   </TableCell>
                   {activeTab === 'Approved' && (
@@ -302,7 +284,7 @@ export default function AdminReviewPage() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isProcessing} onClick={() => {setSelectedSubmission(null); setTokensToAward(0);}}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={processApproval} disabled={isProcessing} className="bg-green-600 hover:bg-green-700">
-              {isProcessing ? 'Processing...' : 'Approve & Award'}
+              {isProcessing ? 'Processing...' : 'Approve & Award HTR'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
