@@ -20,7 +20,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context.jsx';
 import { auth, db } from '@/lib/firebase/config.js';
 import { signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser as deleteFirebaseUser } from 'firebase/auth';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton.jsx';
 import { cn } from '@/lib/utils.js';
 
@@ -104,15 +104,44 @@ export default function SettingsPage() {
         const credential = EmailAuthProvider.credential(firebaseUser.email, passwordForDelete);
         await reauthenticateWithCredential(firebaseUser, credential);
 
-        // Delete user data from Firestore
+        // Step 1: Delete user's submissions from Firestore
+        try {
+          console.log('[SettingsPage] Attempting to delete submissions for user:', firebaseUser.uid);
+          const submissionsQuery = query(collection(db, 'submissions'), where('userId', '==', firebaseUser.uid));
+          const submissionsSnapshot = await getDocs(submissionsQuery);
+          const batch = writeBatch(db);
+          let submissionsCount = 0;
+          submissionsSnapshot.forEach((docSnapshot) => {
+            batch.delete(docSnapshot.ref);
+            submissionsCount++;
+          });
+          if (submissionsCount > 0) {
+            await batch.commit();
+            console.log(`[SettingsPage] Successfully deleted ${submissionsCount} submissions for user ${firebaseUser.uid}.`);
+          } else {
+            console.log(`[SettingsPage] No submissions found to delete for user ${firebaseUser.uid}.`);
+          }
+        } catch (submissionsError) {
+          console.error("Error deleting user submissions from Firestore: ", submissionsError);
+          // Do not stop the account deletion process if submissions deletion fails, but notify user.
+          toast({
+            title: 'Submissions Deletion Issue',
+            description: "Could not delete all user submissions. Some data might remain. Please contact support if needed.",
+            variant: 'destructive',
+            duration: 9000,
+          });
+        }
+
+        // Step 2: Delete user data from 'users' collection in Firestore
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         try {
           await deleteDoc(userDocRef);
+          console.log('[SettingsPage] User document deleted from Firestore.');
         } catch (firestoreError) {
           console.error("Error deleting user document from Firestore: ", firestoreError);
           let firestoreErrorDesc = "Could not delete your user data from our records.";
           if (firestoreError.code === 'permission-denied') {
-            firestoreErrorDesc = "Could not delete user data: Permission denied. Please check Firestore security rules to allow users to delete their own document in the 'users' collection.";
+            firestoreErrorDesc = "Could not delete user data: Permission denied by Firestore rules. Ensure users can delete their own document in the 'users' collection.";
           }
           toast({
             title: 'Data Deletion Failed',
@@ -121,21 +150,21 @@ export default function SettingsPage() {
             duration: 9000,
           });
           // We might still proceed to delete the auth user, or stop here.
-          // For now, let's stop if Firestore deletion fails, as it's part of the process.
+          // For now, let's stop if Firestore user document deletion fails, as it's part of the process.
           setIsDeleteAccountLoading(false);
           return;
         }
         
-
-        // Delete user from Firebase Auth
+        // Step 3: Delete user from Firebase Auth
         await deleteFirebaseUser(firebaseUser);
+        console.log('[SettingsPage] Firebase Auth user deleted.');
         
         toast({
             title: 'Account Deleted',
-            description: 'Your account has been permanently deleted.',
+            description: 'Your account and associated data have been permanently deleted.',
         });
         setPasswordForDelete(''); 
-        // AuthContext will handle UI update
+        // AuthContext will handle UI update (user becomes null)
     } catch (error) {
         let desc = "Could not delete your account. Please try again.";
         if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
@@ -144,12 +173,10 @@ export default function SettingsPage() {
         } else if (error.code === 'auth/requires-recent-login') {
             desc = "This operation is sensitive and requires recent authentication. Please log out and log back in before trying again.";
         } else if (error.code === 'permission-denied' && error.message.includes('firestore')) {
-            // This specific check might be redundant if caught by the inner try-catch, but good for general auth errors
              desc = "Could not delete user data due to Firestore permissions. Please check security rules.";
         }
         else {
-            // Log only unexpected errors
-            console.error("Error deleting account: ", error);
+            console.error("[SettingsPage] Error deleting account: ", error);
         }
         toast({
             title: 'Account Deletion Failed',
@@ -185,7 +212,7 @@ export default function SettingsPage() {
         } else if (error.code === 'auth/requires-recent-login') {
              desc = "This operation is sensitive and requires recent authentication. Please log out and log back in before trying again.";
         } else {
-            console.error('Password update error:', error);
+            console.error('[SettingsPage] Password update error:', error);
         }
       toast({
         title: 'Password Update Failed',
@@ -357,7 +384,7 @@ export default function SettingsPage() {
                       <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                       <AlertDialogDescription>
                         This action cannot be undone. This will permanently delete your
-                        account and remove your data. Please enter your current password to confirm.
+                        account and remove your data, including all task submissions. Please enter your current password to confirm.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-2">
@@ -422,4 +449,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
