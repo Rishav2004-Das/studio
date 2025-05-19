@@ -2,10 +2,11 @@
 
 ## Core Features:
 
-- Task List: Display available tasks: Create Meme, Upload Tweet, Share Blog, Polls and Quizes, and create short videos
+- Task List: Display available tasks: Create Meme, Upload Tweet, Share Blog, Polls and Quizzes, and create short videos
 - Task Submission: Display task details and submission form (file upload and caption).
-- User Profile: Display user profile with token balance and submission history.
-- Leaderboard: Display a leaderboard of top token earners.
+- User Profile: Display user profile with HTR balance and submission history.
+- Settings: Theme toggle, password update, logout, and account deletion.
+- Admin Review: An admin-only page to review, approve, or reject task submissions and award HTR.
 
 ## Style Guidelines:
 
