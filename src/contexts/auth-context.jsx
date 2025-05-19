@@ -17,15 +17,19 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('[AuthContext] onAuthStateChanged triggered. User:', user ? user.uid : 'null');
       try {
         if (user) {
           setFirebaseUser(user);
           const userDocRef = doc(db, 'users', user.uid);
+          console.log('[AuthContext] Attempting to get user document:', userDocRef.path);
           const userDocSnap = await getDoc(userDocRef);
 
           if (userDocSnap.exists()) {
+            console.log('[AuthContext] User document exists. Data:', userDocSnap.data());
             setCurrentUser(userDocSnap.data());
           } else {
+            console.log('[AuthContext] User document does not exist. Creating new user document.');
             const newUser = {
               id: user.uid,
               name: user.displayName || user.email?.split('@')[0] || 'New User',
@@ -33,26 +37,32 @@ export function AuthProvider({ children }) {
               avatarUrl: user.photoURL || null,
               tokenBalance: 0,
               createdAt: serverTimestamp(),
-              // isAdmin: false, // Explicitly set isAdmin to false for new users
+              isAdmin: false, // Explicitly set isAdmin to false for new users
             };
+            console.log('[AuthContext] New user data to be set:', newUser);
             await setDoc(userDocRef, newUser);
+            console.log('[AuthContext] New user document created successfully.');
             setCurrentUser(newUser);
           }
         } else {
+          console.log('[AuthContext] No authenticated user.');
           setCurrentUser(null);
           setFirebaseUser(null);
         }
       } catch (error) {
-        console.error("[AuthContext] Error processing auth state change or fetching user doc:", error);
-        setCurrentUser(null); 
+        console.error("[AuthContext] Error processing auth state change or fetching/setting user doc:", error);
+        // Log the full error object for more details
+        console.error("[AuthContext] Full Firebase error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        setCurrentUser(null);
         setFirebaseUser(null);
       } finally {
+        // console.log('[AuthContext] Setting isLoading to false.');
         setIsLoading(false);
       }
     });
 
     return () => {
-      // Removed console.log here
+      // console.log('[AuthContext] Unsubscribing from onAuthStateChanged.');
       unsubscribe();
     };
   }, []);
