@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config.js';
-import { Skeleton } from '@/components/ui/skeleton.jsx'; 
+import { Skeleton } from '@/components/ui/skeleton.jsx';
 
 
 const AuthContext = createContext(undefined);
@@ -17,35 +17,44 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setIsLoading(true);
-      if (user) {
-        setFirebaseUser(user);
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
+      try {
+        if (user) {
+          setFirebaseUser(user);
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDocSnap = await getDoc(userDocRef);
 
-        if (userDocSnap.exists()) {
-          setCurrentUser(userDocSnap.data());
+          if (userDocSnap.exists()) {
+            setCurrentUser(userDocSnap.data());
+          } else {
+            const newUser = {
+              id: user.uid,
+              name: user.displayName || user.email?.split('@')[0] || 'New User',
+              email: user.email || '',
+              avatarUrl: user.photoURL || null,
+              tokenBalance: 0,
+              createdAt: serverTimestamp(),
+              // isAdmin: false, // Explicitly set isAdmin to false for new users
+            };
+            await setDoc(userDocRef, newUser);
+            setCurrentUser(newUser);
+          }
         } else {
-          // If user exists in Auth but not Firestore (e.g. first sign-up), create doc
-          const newUser = {
-            id: user.uid,
-            name: user.displayName || user.email?.split('@')[0] || 'New User',
-            email: user.email || '',
-            avatarUrl: user.photoURL || null,
-            tokenBalance: 0,
-            createdAt: serverTimestamp(), 
-          };
-          await setDoc(userDocRef, newUser);
-          setCurrentUser(newUser);
+          setCurrentUser(null);
+          setFirebaseUser(null);
         }
-      } else {
-        setCurrentUser(null);
+      } catch (error) {
+        console.error("[AuthContext] Error processing auth state change or fetching user doc:", error);
+        setCurrentUser(null); 
         setFirebaseUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      // Removed console.log here
+      unsubscribe();
+    };
   }, []);
 
   if (isLoading) {
