@@ -10,9 +10,9 @@ import { ArrowLeft } from "lucide-react";
 
 
 export async function generateMetadata({ params }) {
-  const resolvedParams = await params; 
+  const resolvedParams = await params;
   const taskId = resolvedParams.id;
-  const task = await getTaskById(taskId); 
+  const task = await getTaskById(taskId);
   if (!task) {
     return {
       title: "Task Not Found | Telebounties"
@@ -25,16 +25,16 @@ export async function generateMetadata({ params }) {
 }
 
 export async function generateStaticParams() {
-  const { mockTasks } = await import("@/lib/mock-data.js"); 
+  const { mockTasks } = await import("@/lib/mock-data.js");
   return mockTasks.map((task) => ({
     id: task.id,
   }));
 }
 
 export default async function TaskDetailPage({ params }) {
-  const resolvedParams = await params; 
+  const resolvedParams = await params;
   const taskId = resolvedParams.id;
-  const task = await getTaskById(taskId); 
+  const task = await getTaskById(taskId);
 
   if (!task) {
     notFound();
@@ -70,10 +70,13 @@ export default async function TaskDetailPage({ params }) {
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="mb-6 flex items-center text-lg font-semibold text-accent">
+              <div className="mb-1 flex items-center text-lg font-semibold text-accent">
                 <Award className="mr-2 h-6 w-6" />
                 <span>Earn {task.tokens} HTR</span>
               </div>
+              <p className="text-xs text-muted-foreground mb-6">
+                Please note: HTR awards are based on submission quality and admin review. The final HTR awarded may be adjusted.
+              </p>
               <h2 className="mb-3 text-xl font-semibold text-foreground">Task Description</h2>
               <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground/80">
                 {task.description}
