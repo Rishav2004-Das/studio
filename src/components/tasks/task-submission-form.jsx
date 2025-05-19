@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input.jsx";
 import { Textarea } from "@/components/ui/textarea.jsx";
 import { useToast } from "@/hooks/use-toast.js";
-import { Send, LogIn, Link as LinkIcon } from "lucide-react"; // Changed Paperclip to LinkIcon
+import { Send, LogIn, Link as LinkIcon } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context.jsx";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.jsx";
@@ -52,26 +52,27 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
   async function onSubmit(data) {
     if (!currentUser || !currentUser.id) {
       toast({ title: "Error", description: "User not found. Please log in.", variant: "destructive" });
+      setIsSubmitting(false); // Ensure loading state is reset
       return;
     }
     setIsSubmitting(true);
     console.log("[TaskSubmission] Form data submitted:", data);
 
-    try {
-      const submissionData = {
-        userId: currentUser.id,
-        submitterName: currentUser.name || "Unknown User",
-        taskId: taskId,
-        taskTitle: taskTitle,
-        originalTaskTokens: Number(taskTokens) || 0,
-        caption: data.caption,
-        fileLink: data.fileLink || null, // Store the link or null
-        submittedAt: serverTimestamp(),
-        status: "Pending", // Submissions are now pending admin review
-        tokensAwarded: 0,   // HTR awarded by admin
-      };
+    const submissionData = {
+      userId: currentUser.id,
+      submitterName: currentUser.name || "Anonymous User", // Fallback for name
+      taskId: taskId,
+      taskTitle: taskTitle,
+      originalTaskTokens: Number(taskTokens) || 0,
+      caption: data.caption,
+      fileLink: data.fileLink || null, // Store the link or null if empty
+      submittedAt: serverTimestamp(),
+      status: "Pending",
+      tokensAwarded: 0,
+    };
 
-      console.log("[TaskSubmission] Attempting to add submission to Firestore:", submissionData);
+    try {
+      console.log("[TaskSubmission] Attempting to add submission to Firestore with data:", JSON.stringify(submissionData, null, 2));
       await addDoc(collection(db, "submissions"), submissionData);
       console.log("[TaskSubmission] Firestore document added successfully.");
 
@@ -83,14 +84,11 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
       });
       form.reset();
     } catch (error) {
-      console.error("[TaskSubmission] Full submission error object:", error);
+      console.error("[TaskSubmission] Full Firestore submission error object:", error);
       let description = "Could not submit your task. Please try again.";
       
       if (error.name === 'FirebaseError') {
-        description = `Submission failed: ${error.message} (Code: ${error.code || 'N/A'}).`;
-        if (error.code === 'permission-denied') { 
-            description = `Submission to database failed: Permission denied. Please check your Firestore security rules for the 'submissions' collection. (Code: ${error.code})`;
-        }
+        description = `Submission to database failed: ${error.message} (Code: ${error.code || 'N/A'}). Please check your Firestore security rules for the 'submissions' collection.`;
       } else if (error instanceof z.ZodError) {
         description = "Invalid submission data. Please check the form fields.";
       }
@@ -173,13 +171,13 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
             <FormItem>
               <FormLabel htmlFor="file-link-input" className="flex items-center">
                 <LinkIcon className="mr-2 h-4 w-4" />
-                Link to your submission file (Optional)
+                Link to your submission file
               </FormLabel>
               <FormControl>
                 <Input
                   id="file-link-input"
                   type="url"
-                  placeholder="https://your-file-host.com/your-file"
+                  placeholder="https://your-file-host.com/your-file (e.g., Google Drive, Imgur)"
                   {...field}
                   className="block w-full text-sm text-muted-foreground"
                   disabled={isSubmitting}
@@ -187,7 +185,7 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
               </FormControl>
               <FormMessage />
                <p className="text-xs text-muted-foreground mt-1">
-                Upload your file to a service like Google Drive, Dropbox, Imgur, etc., and paste the shareable link here.
+                If your task involves a file, upload it to a service like Google Drive, Dropbox, Imgur, etc., and paste the shareable link here.
               </p>
             </FormItem>
           )}
