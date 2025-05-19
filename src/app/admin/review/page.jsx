@@ -64,10 +64,10 @@ export default function AdminReviewPage() {
       return;
     }
 
-    console.log('[AdminReviewPage] Fetching submissions for status:', statusToFetch, 'as user:', JSON.stringify(currentUser, null, 2));
+    console.log('[AdminReviewPage] Fetching submissions for status:', statusToFetch, 'as user:', currentUser ? currentUser.email : 'No user');
     setPageIsLoading(true);
     setFetchError(null);
-    setSubmissions([]);
+    setSubmissions([]); // Clear previous submissions
 
     try {
       const submissionsCol = collection(db, 'submissions');
@@ -98,19 +98,19 @@ export default function AdminReviewPage() {
         fullErrorMessage = `Error: Permission Denied by Firestore Rules.
         1. Ensure your user account has 'isAdmin: true' (boolean) in its Firestore document.
         2. Verify your Firestore security rules allow admins to 'list' the 'submissions' collection with the current query.
-        3. This error can sometimes mask a missing Firestore index. If admin status and rules are correct, ensure a composite index exists for 'submissions' on 'status' (e.g., Ascending) and 'submittedAt' (Descending).
-        4. Check the browser's developer console for the full Firebase error object for more clues.`;
+        3. This error can sometimes mask a missing Firestore index. If admin status and rules are correct, ensure a composite index exists for 'submissions' on 'status' (e.g., Ascending) AND 'submittedAt' (Descending).
+        4. Check the browser's developer console for the full Firebase error object and any links from Firebase to create missing indexes.`;
          if (!fetchErrorToastShown) {
-           // Suppressing toast for permission-denied as per previous request
+           // Suppressing toast for permission-denied to avoid continuous pop-ups if the issue is persistent
            // toast({ title, description, variant: 'destructive', duration: 10000 });
            // setFetchErrorToastShown(true);
          }
       } else if (error.code === 'failed-precondition') {
          title = 'Query Requires Index';
          description = `Could not load ${statusToFetch.toLowerCase()} submissions because a Firestore index is missing.`;
-         fullErrorMessage = `Error: Query Requires Index. Please check the browser's developer console for a link from Firebase to create the required composite index for 'submissions' on 'status' (e.g., Ascending) and 'submittedAt' (Descending). This is a common issue for admin queries.`;
+         fullErrorMessage = `Error: Query Requires Index. Please check the browser's developer console for a link from Firebase to create the required composite index for 'submissions' on 'status' (e.g., Ascending) AND 'submittedAt' (Descending). This is a common issue for admin queries. Click that link!`;
           if (!fetchErrorToastShown) {
-            // Suppressing toast for failed-precondition as per previous request
+            // Suppressing toast for failed-precondition as well
             // toast({ title, description, variant: 'destructive', duration: 10000 });
             // setFetchErrorToastShown(true);
           }
@@ -129,11 +129,11 @@ export default function AdminReviewPage() {
   }, [currentUser, toast, fetchErrorToastShown]);
 
   useEffect(() => {
-    console.log('[AdminReviewPage] useEffect triggered. activeTab:', activeTab, 'authContextIsLoading:', authContextIsLoading, 'currentUser:', JSON.stringify(currentUser, null, 2));
+    console.log('[AdminReviewPage] useEffect triggered. activeTab:', activeTab, 'authContextIsLoading:', authContextIsLoading, 'currentUser:', currentUser ? currentUser.email : 'No user');
     if (!authContextIsLoading) {
         if (currentUser && currentUser.isAdmin === true) {
             console.log('[AdminReviewPage] useEffect: User is admin, calling fetchSubmissions for tab:', activeTab);
-            setFetchErrorToastShown(false);
+            setFetchErrorToastShown(false); // Reset toast shown flag when fetching for a new tab or user
             fetchSubmissions(activeTab);
         } else if (currentUser && currentUser.isAdmin !== true) {
             console.warn('[AdminReviewPage] useEffect: User is not an admin.');
@@ -141,7 +141,7 @@ export default function AdminReviewPage() {
             setFetchError(accessDeniedMsg);
             setPageIsLoading(false);
             setSubmissions([]);
-        } else { 
+        } else {
              console.warn('[AdminReviewPage] useEffect: No user logged in.');
              const noUserMsg = "Access Denied: No user is currently logged in. Please log in with an admin account.";
              setFetchError(noUserMsg);
@@ -150,7 +150,7 @@ export default function AdminReviewPage() {
         }
     } else {
         console.log('[AdminReviewPage] useEffect: Auth context is still loading. Deferring fetch.');
-        setPageIsLoading(true);
+        setPageIsLoading(true); // Set loading to true while auth is resolving
         setFetchError(null);
         setFetchErrorToastShown(false);
     }
@@ -159,7 +159,7 @@ export default function AdminReviewPage() {
 
   const handleApproveClick = (submission) => {
     setSelectedSubmission(submission);
-    setTokensToAward(submission.originalTaskTokens || 0); // Use originalTaskTokens
+    setTokensToAward(submission.originalTaskTokens || 0);
     setIsApproveDialogOpen(true);
   };
 
@@ -244,6 +244,57 @@ export default function AdminReviewPage() {
     }
   };
 
+  const renderRowCells = (submission) => {
+    const cells = [];
+
+    cells.push(<TableCell key="taskTitle" className="font-medium">{submission.taskTitle}</TableCell>);
+    cells.push(<TableCell key="submitterName">{submission.submitterName}</TableCell>);
+    cells.push(<TableCell key="submittedAt">{new Date(submission.submittedAt).toLocaleDateString()}</TableCell>);
+    cells.push(<TableCell key="caption" className="max-w-xs truncate">{submission.caption}</TableCell>);
+    cells.push(
+      <TableCell key="fileLink">
+        {submission.fileLink ? (
+          <Button variant="link" asChild size="sm">
+            <a href={submission.fileLink} target="_blank" rel="noopener noreferrer">
+              View Submitted File <ExternalLink className="ml-1 h-3 w-3" />
+            </a>
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">No link</span>
+        )}
+      </TableCell>
+    );
+
+    if (activeTab === 'Approved') {
+      cells.push(
+        <TableCell key="tokensAwarded" className="text-right">
+          <Badge variant="outline" className="bg-accent text-accent-foreground">
+            <Coins className="mr-1.5 h-3 w-3" />{submission.tokensAwarded}
+          </Badge>
+        </TableCell>
+      );
+    }
+
+    cells.push(
+      <TableCell key="actions" className="text-center">
+        {submission.status === 'Pending' && (
+          <div className="flex gap-2 justify-center">
+            <Button size="sm" variant="outline" className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleApproveClick(submission)} disabled={isProcessing}>
+              Approve
+            </Button>
+            <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(submission)} disabled={isProcessing}>
+              Reject
+            </Button>
+          </div>
+        )}
+        {submission.status === 'Approved' && <Badge className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Approved</Badge>}
+        {submission.status === 'Rejected' && <Badge className="bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">Rejected</Badge>}
+      </TableCell>
+    );
+    return cells;
+  };
+
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-8 tracking-tight text-foreground">Review Submissions</h1>
@@ -268,7 +319,10 @@ export default function AdminReviewPage() {
           <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Submissions</h2>
           <p className="text-sm text-destructive whitespace-pre-wrap">{fetchError}</p>
           <p className="text-xs text-muted-foreground mt-4">
-            Please verify your Firestore security rules, ensure the admin user has `isAdmin: true` in their Firestore document, and check the browser's developer console for any detailed Firebase error messages (especially links to create missing Firestore indexes if the error code is 'failed-precondition' or similar for the admin query on 'status' and 'submittedAt').
+            If this error mentions "Permission Denied" or "Missing Index":
+            1. Ensure your admin user has `isAdmin: true` (boolean) in their Firestore document (/users/YOUR_UID).
+            2. Check your browser's developer console for a Firebase error message. If it includes a link to create a Firestore index (especially for 'status' and 'submittedAt' on the 'submissions' collection), please click it and create the index in your Firebase console.
+            3. Verify your Firestore Security Rules allow admins to `list` the `submissions` collection.
           </p>
         </div>
       ) : submissions.length === 0 ? (
@@ -290,48 +344,13 @@ export default function AdminReviewPage() {
                 <TableHead>Caption</TableHead>
                 <TableHead>File Link</TableHead>
                 {activeTab === 'Approved' && <TableHead className="text-right">HTR Awarded</TableHead>}
-                <TableHead className="text-center">Actions</TableHead> {/* Ensure this line is present */}
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {submissions.map((submission) => (
                 <TableRow key={submission.id}>
-                  <TableCell className="font-medium">{submission.taskTitle}</TableCell>
-                  <TableCell>{submission.submitterName}</TableCell>
-                  <TableCell>{new Date(submission.submittedAt).toLocaleDateString()}</TableCell>
-                  <TableCell className="max-w-xs truncate">{submission.caption}</TableCell>
-                  <TableCell>
-                    {submission.fileLink ? (
-                      <Button variant="link" asChild size="sm">
-                        <a href={submission.fileLink} target="_blank" rel="noopener noreferrer">
-                          View Submitted File <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">No link</span>
-                    )}
-                  </TableCell>
-                  {activeTab === 'Approved' && (
-                    <TableCell className="text-right">
-                      <Badge variant="outline" className="bg-accent text-accent-foreground">
-                         <Coins className="mr-1.5 h-3 w-3" />{submission.tokensAwarded}
-                      </Badge>
-                    </TableCell>
-                  )}
-                  <TableCell className="text-center"> {/* Ensure this cell is present for each row */}
-                    {submission.status === 'Pending' && (
-                      <div className="flex gap-2 justify-center">
-                        <Button size="sm" variant="outline" className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleApproveClick(submission)} disabled={isProcessing}>
-                          Approve
-                        </Button>
-                        <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(submission)} disabled={isProcessing}>
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                    {submission.status === 'Approved' && <Badge className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Approved</Badge>}
-                    {submission.status === 'Rejected' && <Badge className="bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">Rejected</Badge>}
-                  </TableCell>
+                  {renderRowCells(submission)}
                 </TableRow>
               ))}
             </TableBody>
@@ -386,5 +405,3 @@ export default function AdminReviewPage() {
     </div>
   );
 }
-
-    
