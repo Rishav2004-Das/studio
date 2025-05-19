@@ -22,7 +22,7 @@ export function SubmissionHistoryItem({ submission, taskTitle }) {
     <Card className="overflow-hidden shadow-md transition-shadow hover:shadow-lg">
       <CardContent className="p-4">
         <div className="flex flex-col gap-4 sm:flex-row">
-          {submission.fileUrl && (submission.fileUrl.startsWith('https://picsum.photos') || submission.fileUrl.match(/\.(jpeg|jpg|gif|png)$/i)) && (
+          {submission.fileUrl && (submission.fileUrl.startsWith('https://placehold.co') || submission.fileUrl.match(/\.(jpeg|jpg|gif|png)$/i)) && (
             <div className="relative h-32 w-full flex-shrink-0 sm:h-24 sm:w-24">
               <Image
                 src={submission.fileUrl}
@@ -56,7 +56,7 @@ export function SubmissionHistoryItem({ submission, taskTitle }) {
         </Badge>
         {submission.status === "Approved" && submission.tokensAwarded != null && (
           <div className="flex items-center text-sm font-semibold text-accent">
-            <Award className="mr-1.5 h-4 w-4" /> +{submission.tokensAwarded} Tokens
+            <Award className="mr-1.5 h-4 w-4" /> +{submission.tokensAwarded} HTR
           </div>
         )}
       </CardFooter>

@@ -10,9 +10,9 @@ import { ArrowLeft } from "lucide-react";
 
 
 export async function generateMetadata({ params }) {
-  const resolvedParams = await params; // Await params
+  const resolvedParams = await params; 
   const taskId = resolvedParams.id;
-  const task = await getTaskById(taskId); // Await the async function
+  const task = await getTaskById(taskId); 
   if (!task) {
     return {
       title: "Task Not Found | Telebounties"
@@ -25,25 +25,16 @@ export async function generateMetadata({ params }) {
 }
 
 export async function generateStaticParams() {
-  // mockTasks can be used directly if it's just an array of objects with 'id'
-  // This needs to be an array of objects where each object has the 'id' property matching the dynamic segment.
-  const tasks = await getTaskById(); // Assuming getTaskById without an arg returns all tasks or ids
-                                     // Or, if you have a dedicated function like getAllTaskIds()
-  // If getTaskById() cannot return all task IDs, you might need to adjust this logic
-  // For now, let's assume you have a way to get all task IDs or use mockTasks directly if it's a static list
-  // and getTaskById is only for fetching a single task.
-  // Let's revert to mockTasks for generateStaticParams if getTaskById is only for single fetch.
-  // This depends on how getTaskById is structured. If it's from mock-data.js, mockTasks is better here.
-  const { mockTasks } = await import("@/lib/mock-data.js"); // Re-importing if needed
+  const { mockTasks } = await import("@/lib/mock-data.js"); 
   return mockTasks.map((task) => ({
     id: task.id,
   }));
 }
 
 export default async function TaskDetailPage({ params }) {
-  const resolvedParams = await params; // Await params
+  const resolvedParams = await params; 
   const taskId = resolvedParams.id;
-  const task = await getTaskById(taskId); // Await the async function
+  const task = await getTaskById(taskId); 
 
   if (!task) {
     notFound();
@@ -81,7 +72,7 @@ export default async function TaskDetailPage({ params }) {
             <CardContent className="p-6">
               <div className="mb-6 flex items-center text-lg font-semibold text-accent">
                 <Award className="mr-2 h-6 w-6" />
-                <span>Earn {task.tokens} Tokens</span>
+                <span>Earn {task.tokens} HTR</span>
               </div>
               <h2 className="mb-3 text-xl font-semibold text-foreground">Task Description</h2>
               <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground/80">

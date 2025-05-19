@@ -42,7 +42,7 @@ export function AppHeader() {
           <>
             <div className="flex items-center gap-1 text-sm font-medium text-accent">
               <Award className="h-5 w-5" />
-              <span>{currentUser.tokenBalance.toLocaleString()} Tokens</span>
+              <span>{currentUser.tokenBalance.toLocaleString()} HTR</span>
             </div>
             <Link href="/profile">
               <Avatar className="h-9 w-9 cursor-pointer">

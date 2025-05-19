@@ -1,9 +1,10 @@
-import { TaskCard } from "@/components/tasks/task-card";
-import { mockTasks } from "@/lib/mock-data";
+
+import { TaskCard } from "@/components/tasks/task-card.jsx";
+import { mockTasks } from "@/lib/mock-data.js";
 
 export const metadata = {
   title: "Available Tasks | Telebounties",
-  description: "Browse and complete tasks to earn tokens on Telebounties.",
+  description: "Browse and complete tasks to earn HTR on Telebounties.",
 };
 
 export default function TasksPage() {

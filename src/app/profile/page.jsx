@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { UserProfileCard } from '@/components/profile/user-profile-card.jsx';
 import { SubmissionHistoryItem } from '@/components/profile/submission-history-item.jsx';
@@ -13,19 +13,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Skeleton } from '@/components/ui/skeleton.jsx';
 import { useToast } from '@/hooks/use-toast.js';
 import { useAuth } from '@/contexts/auth-context.jsx';
-import { auth, db } from '@/lib/firebase/config.js'; // Removed 'storage'
+import { auth, db } from '@/lib/firebase/config.js'; 
 import { signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-// Removed storage-related imports: ref, uploadBytes, getDownloadURL, updateDoc
 
 export default function ProfilePage() {
   const { toast } = useToast();
-  const { currentUser, firebaseUser, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { currentUser, isLoading: authLoading, isAuthenticated } = useAuth();
   
   const [localCurrentUser, setLocalCurrentUser] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [showLogin, setShowLogin] = useState(true);
-  // Removed fileInputRef, isUpdatingAvatar, handleAvatarClick, handleAvatarUpdate
   const [pageLoading, setPageLoading] = useState(true);
 
 
@@ -33,15 +31,13 @@ export default function ProfilePage() {
     if (!authLoading) {
       setPageLoading(false);
       if (currentUser && currentUser.id) {
-        // Fetch user data again to ensure localCurrentUser is up-to-date
         const fetchUserData = async () => {
           const userDocRef = doc(db, 'users', currentUser.id);
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
             setLocalCurrentUser(userDocSnap.data());
           } else {
-             // This case should ideally not happen if AuthContext handles creation properly
-            setLocalCurrentUser(currentUser); // Fallback to context user
+            setLocalCurrentUser(currentUser); 
           }
         };
         fetchUserData();
@@ -82,7 +78,7 @@ export default function ProfilePage() {
     }
   }, [authLoading, currentUser, toast]);
 
-  const handleAuthSuccess = async (userId) => {
+  const handleAuthSuccess = async () => {
     // AuthContext will update currentUser, which triggers the useEffect above
   };
 
@@ -103,7 +99,6 @@ export default function ProfilePage() {
     }
   };
 
-  // handleAvatarClick and handleAvatarUpdate functions removed as avatar uploads are disabled.
 
   if (pageLoading || authLoading) {
     return (
@@ -137,8 +132,8 @@ export default function ProfilePage() {
             </CardTitle>
             <CardDescription>
               {showLogin
-                ? 'Log in to access your profile.'
-                : 'Sign up to start earning tokens.'}
+                ? 'Log in to access your profile and earn HTR.'
+                : 'Sign up to start earning HTR.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -161,21 +156,9 @@ export default function ProfilePage() {
 
   return (
     <div className="container mx-auto">
-      {/* Removed file input for avatar */}
-      {/* <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleAvatarUpdate}
-        accept="image/*"
-        style={{ display: 'none' }}
-        disabled={isUpdatingAvatar}
-      /> */}
-
       <UserProfileCard
         user={localCurrentUser}
-        // onAvatarClick prop removed as uploads are disabled
         isOwnProfile={true}
-        // isUpdatingAvatar prop removed
       />
        <div className="mt-2 p-4 border border-dashed rounded-md bg-muted/50 text-center">
             <p className="text-sm text-muted-foreground">

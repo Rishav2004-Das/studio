@@ -1,5 +1,5 @@
 
-import { Geist } from "next/font/google"; // Removed Geist_Mono
+import { Geist } from "next/font/google"; 
 import "./globals.css";
 import { AppLayout } from "@/components/layout/app-layout.jsx";
 import { AuthProvider } from "@/contexts/auth-context.jsx"; 
@@ -9,15 +9,10 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-// Removed Geist_Mono setup
-// const geistMono = Geist_Mono({
-//   variable: "--font-geist-mono",
-//   subsets: ["latin"],
-// });
 
 export const metadata = {
   title: "Telebounties App",
-  description: "Complete tasks, earn tokens, and climb the leaderboard!",
+  description: "Complete tasks, earn HTR, and climb the leaderboard!",
 };
 
 export default function RootLayout({
@@ -26,9 +21,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} antialiased`} // Removed geistMono.variable
+        className={`${geistSans.variable} antialiased`} 
       >
-        <AuthProvider> {/* Wrap AppLayout with AuthProvider */}
+        <AuthProvider> 
           <AppLayout>{children}</AppLayout>
         </AuthProvider>
       </body>

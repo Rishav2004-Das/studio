@@ -7,12 +7,12 @@ import { getIconComponent } from "@/lib/mock-data.js";
 
 
 export function TaskCard({ task }) {
-  const IconComponent = getIconComponent(task.icon); // Get the icon component using the helper
+  const IconComponent = getIconComponent(task.icon); 
   return (
     <Card className="flex h-full flex-col overflow-hidden shadow-lg transition-shadow hover:shadow-xl">
       <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-2">
         <div className="rounded-lg bg-primary/10 p-3 text-primary">
-          <IconComponent className="h-8 w-8" />
+          {IconComponent && <IconComponent className="h-8 w-8" />}
         </div>
         <div className="flex-1">
           <CardTitle className="text-xl">{task.title}</CardTitle>
@@ -25,7 +25,7 @@ export function TaskCard({ task }) {
       <CardFooter className="flex items-center justify-between bg-muted/50 p-4">
         <div className="flex items-center text-accent">
           <Award className="mr-2 h-5 w-5" />
-          <span className="font-semibold">{task.tokens} Tokens</span>
+          <span className="font-semibold">{task.tokens} HTR</span>
         </div>
         <Button asChild variant="ghost" size="sm">
           <Link href={`/tasks/${task.id}`}>

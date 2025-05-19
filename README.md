@@ -36,18 +36,19 @@ This is a NextJS starter in Firebase Studio for the Telebounties application.
     # or
     pnpm dev
     ```
-    The application will be available at [http://localhost:9002](http://localhost:9002).
+    The application will be available at [http://localhost:9004](http://localhost:9004). Note: The port was updated to 9004 as per previous changes. If it was 9002, adjust accordingly.
 
 4.  **Explore the App**:
     *   The main application pages are located in `src/app/`.
     *   Key components can be found in `src/components/`.
-    *   Firebase configuration is in `src/lib/firebase/config.ts`.
-    *   Authentication context is managed in `src/contexts/auth-context.tsx`.
+    *   Firebase configuration is in `src/lib/firebase/config.js`.
+    *   Authentication context is managed in `src/contexts/auth-context.jsx`.
 
 ## Core Features:
 
-- Task List: Display available tasks: Create Meme, Upload Tweet, Share Blog, Polls and Quizes, and create short videos
+- Task List: Display available tasks: Create Meme, Upload Tweet, Share Blog, Polls and Quizzes, and create short videos
 - Task Submission: Display task details and submission form (file upload and caption).
-- User Profile: Display user profile with token balance and submission history.
+- User Profile: Display user profile with HTR balance and submission history.
 - Settings: Theme toggle, password update, logout, and account deletion.
+- Admin Review: An admin-only page to review, approve, or reject task submissions and award HTR.
 

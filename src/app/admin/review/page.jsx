@@ -53,6 +53,7 @@ export default function AdminReviewPage() {
     setIsLoading(true);
     try {
       const submissionsCol = collection(db, 'submissions');
+      // Query for admin review page needs to filter by status and order by submittedAt
       const q = query(submissionsCol, where('status', '==', status), orderBy('submittedAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
@@ -67,24 +68,41 @@ export default function AdminReviewPage() {
     } catch (error) {
       console.error(`Error fetching ${status} submissions (full error object): `, error);
       
-      // Suppress toast for permission-denied and failed-precondition errors
-      if (error.code === 'permission-denied' || error.code === 'failed-precondition') {
-        // Log to console for developer awareness, but don't show UI toast
-        console.warn(`Silent fetch error for ${status} submissions: ${error.message}. This might be due to rules or missing indexes. Check developer console for details.`);
+      let description = `Could not load ${status.toLowerCase()} submissions.`;
+      if (error.code === 'permission-denied') {
+        description += " Permission denied. Ensure Firestore security rules allow admin access and check browser console for index creation links if this is the first time for this query.";
+      } else if (error.code === 'failed-precondition') {
+        description += " This query may require a composite index. Please check the browser's developer console for a link to create the missing index in Firestore.";
       } else {
-        // For other errors, show a generic toast
+        description += " Please try again later.";
+      }
+      
+      // Suppress toast for certain errors to avoid being too intrusive
+      if (error.code === 'permission-denied' || error.code === 'failed-precondition') {
+        // Log to console for developer awareness, but don't show UI toast unless necessary
+        console.warn(`Silent fetch error for ${status} submissions: ${error.message}. This might be due to rules or missing indexes. Check developer console for details.`);
+         // Only show toast if submissions are empty, indicating a real blockage
+        if (submissions.length === 0) {
+           toast({
+            title: `Error Fetching ${status} Submissions`,
+            description: description,
+            variant: 'destructive',
+            duration: 15000, // Longer duration for important messages
+          });
+        }
+      } else {
         toast({
           title: 'Error Fetching Submissions',
-          description: `Could not load ${status.toLowerCase()} submissions. Please try again later.`,
+          description: description,
           variant: 'destructive',
           duration: 10000,
         });
       }
-      setSubmissions([]); // Ensure submissions are cleared on error
+      setSubmissions([]); 
     } finally {
       setIsLoading(false);
     }
-  }, [toast]); // Removed activeTab from dependencies as it's passed as an argument
+  }, [toast, submissions.length]); // Added submissions.length to re-evaluate toast logic
 
   useEffect(() => {
     fetchSubmissions(activeTab);
@@ -103,7 +121,7 @@ export default function AdminReviewPage() {
 
   const processApproval = async () => {
     if (!selectedSubmission || tokensToAward < 0) {
-      toast({ title: "Invalid data", description: "Submission or token amount is invalid.", variant: "destructive" });
+      toast({ title: "Invalid data", description: "Submission or HTR amount is invalid.", variant: "destructive" });
       return;
     }
     setIsProcessing(true);
@@ -130,7 +148,7 @@ export default function AdminReviewPage() {
 
       toast({
         title: 'Submission Approved',
-        description: `${selectedSubmission.taskTitle} by ${selectedSubmission.submitterName} approved. ${tokensToAward} tokens awarded.`,
+        description: `${selectedSubmission.taskTitle} by ${selectedSubmission.submitterName} approved. ${tokensToAward} HTR awarded.`,
       });
       setIsApproveDialogOpen(false);
       setSelectedSubmission(null);
@@ -212,7 +230,7 @@ export default function AdminReviewPage() {
                 <TableHead>Submitted At</TableHead>
                 <TableHead>Caption</TableHead>
                 <TableHead>File</TableHead>
-                {activeTab === 'Approved' && <TableHead className="text-right">Tokens Awarded</TableHead>}
+                {activeTab === 'Approved' && <TableHead className="text-right">HTR Awarded</TableHead>}
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -268,11 +286,11 @@ export default function AdminReviewPage() {
             <AlertDialogTitle>Approve Submission?</AlertDialogTitle>
             <AlertDialogDescription>
               Confirm approval for &quot;{selectedSubmission?.taskTitle}&quot; by {selectedSubmission?.submitterName}.
-              Enter the number of tokens to award. Original task tokens: {selectedSubmission?.originalTaskTokens || 0}.
+              Enter the amount of HTR to award. Original task HTR: {selectedSubmission?.originalTaskTokens || 0}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-2">
-            <Label htmlFor="tokens-awarded">Tokens to Award</Label>
+            <Label htmlFor="tokens-awarded">HTR to Award</Label>
             <Input
               id="tokens-awarded"
               type="number"
