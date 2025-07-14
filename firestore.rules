@@ -1,0 +1,58 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if a user is an admin
+    function isAdmin() {
+      // Check the 'isAdmin' flag on the user's document in the 'users' collection
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Anyone can create their own user document (on signup)
+      allow create: if request.auth.uid == userId;
+      
+      // Users can read their own data. Admins can read anyone's data.
+      allow read: if request.auth.uid == userId || isAdmin();
+      
+      // Users can only update their own data, but cannot make themselves an admin
+      allow update: if request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']);
+      
+      // Users can delete their own account
+      allow delete: if request.auth.uid == userId;
+    }
+
+    // Rules for the 'submissions' collection
+    match /submissions/{submissionId} {
+      // Any authenticated user can create a submission, as long as it's for themselves
+      allow create: if request.auth.uid == request.resource.data.userId;
+
+      // Users can read their own submissions. Admins can read all submissions.
+      allow read: if request.auth.uid == resource.data.userId || isAdmin();
+      
+      // Only admins can update submissions (e.g., to approve/reject)
+      allow update: if isAdmin();
+      
+      // Users can delete their own submissions (for account deletion)
+      allow delete: if request.auth.uid == resource.data.userId;
+    }
+    
+    // Rules for the 'redemptionRequests' collection
+    match /redemptionRequests/{requestId} {
+        // Any authenticated user can create a redemption request for themselves
+        allow create: if request.auth.uid == request.resource.data.userId;
+        
+        // Users can't read redemption requests directly. Only admins can.
+        // This is a security measure to prevent users from seeing others' requests.
+        allow read: if isAdmin();
+        
+        // Only admins can update redemption requests (to complete/deny them)
+        allow update: if isAdmin();
+        
+        // No one can delete redemption requests to maintain a record
+        allow delete: if false;
+    }
+  }
+}
