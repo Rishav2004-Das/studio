@@ -77,19 +77,15 @@ service cloud.firestore {
     }
 
     // 📁 Redemption Requests Collection
-    match /redemptionRequests/{redemptionId} {
+    match /redemptionRequests/{requestId} {
 
-        // ✅ Read, Update, Delete: Only admins can perform these actions.
-        allow read, update, delete: if request.auth != null &&
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // ✅ Read, List, Update, Delete: only admins can manage requests
+      allow read, update, delete, list: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
 
-        // ✅ Create: An authenticated user can create their own redemption request.
-        allow create: if request.auth != null &&
-            request.resource.data.userId == request.auth.uid;
-
-        // ✅ List: Only admins can list all redemption requests.
-        allow list: if request.auth != null &&
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // ✅ Create: user can create their own redemption request
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
     }
   }
 }
