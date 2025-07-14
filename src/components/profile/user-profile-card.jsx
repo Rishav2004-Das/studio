@@ -1,11 +1,12 @@
 
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.jsx";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card.jsx";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar.jsx";
-import { Award, UserCircle2 } from "lucide-react"; 
+import { Award, UserCircle2, DollarSign } from "lucide-react"; 
 import { cn } from "@/lib/utils.js";
+import { Button } from "@/components/ui/button.jsx";
 
 
-export function UserProfileCard({ user, isOwnProfile = false }) { 
+export function UserProfileCard({ user, isOwnProfile = false, onRedeemClick }) { 
   const fallbackInitials = user.name?.split(' ').map(n => n[0]).join('').toUpperCase() || <UserCircle2 />;
 
   return (
@@ -35,6 +36,14 @@ export function UserProfileCard({ user, isOwnProfile = false }) {
             <p className="mt-1 text-sm text-muted-foreground text-center sm:text-left">{user.email}</p>
           )}
         </div>
+        {isOwnProfile && (
+          <div className="self-center sm:self-end">
+            <Button onClick={onRedeemClick}>
+              <DollarSign className="mr-2 h-4 w-4" />
+              Redeem HTR
+            </Button>
+          </div>
+        )}
       </CardHeader>
     </Card>
   );

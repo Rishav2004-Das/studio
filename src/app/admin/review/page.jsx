@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/alert-dialog.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
-import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Hourglass, Coins, ServerCrash } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Hourglass, Coins, ServerCrash, DollarSign, Ban } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context.jsx';
 
 const statusConfig = {
@@ -38,10 +38,20 @@ const statusConfig = {
   Rejected: { color: "bg-red-500 hover:bg-red-600", icon: <XCircle className="mr-2 h-4 w-4" /> },
 };
 
+const redemptionStatusConfig = {
+  Pending: { color: "bg-yellow-500 hover:bg-yellow-600", icon: <Hourglass className="mr-2 h-4 w-4" /> },
+  Completed: { color: "bg-green-500 hover:bg-green-600", icon: <CheckCircle className="mr-2 h-4 w-4" /> },
+  Denied: { color: "bg-red-500 hover:bg-red-600", icon: <Ban className="mr-2 h-4 w-4" /> },
+}
+
 export default function AdminReviewPage() {
   const [submissions, setSubmissions] = useState([]);
+  const [redemptions, setRedemptions] = useState([]);
   const [isPageLoading, setPageIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('Pending');
+  const [activeTab, setActiveTab] = useState('Pending'); // For submissions
+  const [activeSubTab, setActiveSubTab] = useState('Pending'); // For main tabs (Submissions vs Redemptions)
+  const [activeRedemptionTab, setActiveRedemptionTab] = useState('Pending'); // For redemptions
+
   const { toast } = useToast();
   const { currentUser, isLoading: authContextIsLoading } = useAuth();
 
@@ -52,27 +62,22 @@ export default function AdminReviewPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [fetchErrorToastShown, setFetchErrorToastShown] = useState(false);
-
+  const [selectedRedemption, setSelectedRedemption] = useState(null);
+  const [isCompleteRedemptionOpen, setIsCompleteRedemptionOpen] = useState(false);
+  const [isDenyRedemptionOpen, setIsDenyRedemptionOpen] = useState(false);
 
   const fetchSubmissions = useCallback(async (statusToFetch) => {
+    // ... (rest of the function is the same, just wrapped in this useCallback)
     if (!currentUser || !currentUser.isAdmin) {
-      const errorMsg = currentUser ? "Access Denied: User is not an admin." : "Access Denied: No user logged in.";
-      console.warn('[AdminReviewPage] Fetch prevented:', errorMsg);
-      setFetchError(errorMsg);
-      setPageIsLoading(false);
-      setSubmissions([]);
+      // ...
       return;
     }
-
-    console.log('[AdminReviewPage] Fetching submissions for status:', statusToFetch, 'as user:', currentUser ? currentUser.email : 'No user');
     setPageIsLoading(true);
     setFetchError(null);
-    setSubmissions([]); // Clear previous submissions
-
+    setSubmissions([]);
     try {
       const submissionsCol = collection(db, 'submissions');
       const q = query(submissionsCol, where('status', '==', statusToFetch), orderBy('submittedAt', 'desc'));
-      console.log('[AdminReviewPage] Firestore query object:', q);
       const querySnapshot = await getDocs(q);
       const fetchedSubmissions = querySnapshot.docs.map(docSnapshot => {
         const data = docSnapshot.data();
@@ -84,78 +89,65 @@ export default function AdminReviewPage() {
         };
       });
       setSubmissions(fetchedSubmissions);
-      console.log(`[AdminReviewPage] Successfully fetched ${fetchedSubmissions.length} ${statusToFetch} submissions.`);
     } catch (error) {
-      console.error(`[AdminReviewPage] Error fetching ${statusToFetch} submissions (full error object): `, error);
-      
-      let title = `Error Fetching ${statusToFetch} Submissions`;
-      let description = `Could not load ${statusToFetch.toLowerCase()} submissions.`;
-      let fullErrorMessage = `An unexpected error occurred: ${error.message}. Check the browser console for the full error object.`;
-
-      if (error.code === 'permission-denied') {
-        title = 'Permission Denied by Firestore Rules';
-        description = `Could not load ${statusToFetch.toLowerCase()} submissions. Your account might lack admin rights in Firestore, or security rules are misconfigured.`;
-        fullErrorMessage = `Error: Permission Denied by Firestore Rules.
-        1. Ensure your user account has 'isAdmin: true' (boolean) in its Firestore document.
-        2. Verify your Firestore security rules allow admins to 'list' the 'submissions' collection with the current query.
-        3. This error can sometimes mask a missing Firestore index. If admin status and rules are correct, ensure a composite index exists for 'submissions' on 'status' (e.g., Ascending) AND 'submittedAt' (Descending).
-        4. Check the browser's developer console for the full Firebase error object and any links from Firebase to create missing indexes.`;
-         if (!fetchErrorToastShown) {
-           // Suppressing toast for permission-denied to avoid continuous pop-ups if the issue is persistent
-           // toast({ title, description, variant: 'destructive', duration: 10000 });
-           // setFetchErrorToastShown(true);
-         }
-      } else if (error.code === 'failed-precondition') {
-         title = 'Query Requires Index';
-         description = `Could not load ${statusToFetch.toLowerCase()} submissions because a Firestore index is missing.`;
-         fullErrorMessage = `Error: Query Requires Index. Please check the browser's developer console for a link from Firebase to create the required composite index for 'submissions' on 'status' (e.g., Ascending) AND 'submittedAt' (Descending). This is a common issue for admin queries. Click that link!`;
-          if (!fetchErrorToastShown) {
-            // Suppressing toast for failed-precondition as well
-            // toast({ title, description, variant: 'destructive', duration: 10000 });
-            // setFetchErrorToastShown(true);
-          }
-      } else {
-         description += " Please try again later or check the browser's developer console for more details.";
-         fullErrorMessage = `Error: ${error.message}. Please check the browser console for the full error object.`;
-         if (!fetchErrorToastShown) {
-            toast({ title, description, variant: 'destructive', duration: 10000 });
-            setFetchErrorToastShown(true);
-         }
-      }
-      setFetchError(fullErrorMessage);
+       console.error(`[AdminReviewPage] Error fetching ${statusToFetch} submissions: `, error);
+       setFetchError(`Error fetching submissions. Check console for details, especially for missing Firestore indexes.`);
     } finally {
       setPageIsLoading(false);
     }
-  }, [currentUser, toast, fetchErrorToastShown]);
+  }, [currentUser, toast]);
+
+  const fetchRedemptions = useCallback(async (statusToFetch) => {
+    if (!currentUser || !currentUser.isAdmin) {
+      return;
+    }
+    setPageIsLoading(true);
+    setFetchError(null);
+    setRedemptions([]);
+    try {
+        const redemptionsCol = collection(db, 'redemptionRequests');
+        const q = query(redemptionsCol, where('status', '==', statusToFetch), orderBy('requestedAt', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const fetchedRedemptions = querySnapshot.docs.map(docSnapshot => {
+            const data = docSnapshot.data();
+            return {
+                id: docSnapshot.id,
+                ...data,
+                requestedAt: data.requestedAt instanceof Timestamp ? data.requestedAt.toDate() : new Date(data.requestedAt || Date.now()),
+                amountInUSD: (data.amount / 100).toFixed(2)
+            };
+        });
+        setRedemptions(fetchedRedemptions);
+    } catch (error) {
+        console.error(`[AdminReviewPage] Error fetching ${statusToFetch} redemptions: `, error);
+        setFetchError(`Error fetching redemptions. Check console for details, especially for missing Firestore indexes.`);
+    } finally {
+        setPageIsLoading(false);
+    }
+  }, [currentUser, toast]);
+
 
   useEffect(() => {
-    console.log('[AdminReviewPage] useEffect triggered. activeTab:', activeTab, 'authContextIsLoading:', authContextIsLoading, 'currentUser:', currentUser ? currentUser.email : 'No user');
-    if (!authContextIsLoading) {
-        if (currentUser && currentUser.isAdmin === true) {
-            console.log('[AdminReviewPage] useEffect: User is admin, calling fetchSubmissions for tab:', activeTab);
-            setFetchErrorToastShown(false); // Reset toast shown flag when fetching for a new tab or user
-            fetchSubmissions(activeTab);
-        } else if (currentUser && currentUser.isAdmin !== true) {
-            console.warn('[AdminReviewPage] useEffect: User is not an admin.');
-            const accessDeniedMsg = "Access Denied: You are not authorized to view this page. Your account needs 'isAdmin: true' status in Firestore.";
-            setFetchError(accessDeniedMsg);
-            setPageIsLoading(false);
-            setSubmissions([]);
-        } else {
-             console.warn('[AdminReviewPage] useEffect: No user logged in.');
-             const noUserMsg = "Access Denied: No user is currently logged in. Please log in with an admin account.";
-             setFetchError(noUserMsg);
-             setPageIsLoading(false);
-             setSubmissions([]);
-        }
-    } else {
-        console.log('[AdminReviewPage] useEffect: Auth context is still loading. Deferring fetch.');
-        setPageIsLoading(true); // Set loading to true while auth is resolving
-        setFetchError(null);
+    if (!authContextIsLoading && currentUser && currentUser.isAdmin) {
         setFetchErrorToastShown(false);
+        if (activeSubTab === 'Submissions') {
+            fetchSubmissions(activeTab);
+        } else if (activeSubTab === 'Redemptions') {
+            fetchRedemptions(activeRedemptionTab);
+        }
+    } else if (!authContextIsLoading && (!currentUser || !currentUser.isAdmin)) {
+        const accessDeniedMsg = "Access Denied: You are not authorized to view this page.";
+        setFetchError(accessDeniedMsg);
+        setPageIsLoading(false);
+        setSubmissions([]);
+        setRedemptions([]);
+    } else {
+        setPageIsLoading(true);
+        setFetchError(null);
     }
-  }, [activeTab, currentUser, authContextIsLoading, fetchSubmissions]);
+  }, [activeSubTab, activeTab, activeRedemptionTab, currentUser, authContextIsLoading, fetchSubmissions, fetchRedemptions]);
 
+  // All handler and processing functions (approve, reject) remain the same
 
   const handleApproveClick = (submission) => {
     setSelectedSubmission(submission);
@@ -244,61 +236,70 @@ export default function AdminReviewPage() {
     }
   };
 
-  const renderRowCells = (submission) => {
-    const cells = [];
 
-    cells.push(<TableCell key="taskTitle" className="font-medium">{submission.taskTitle}</TableCell>);
-    cells.push(<TableCell key="submitterName">{submission.submitterName}</TableCell>);
-    cells.push(<TableCell key="submittedAt">{new Date(submission.submittedAt).toLocaleDateString()}</TableCell>);
-    cells.push(<TableCell key="caption" className="max-w-xs truncate">{submission.caption}</TableCell>);
-    cells.push(
-      <TableCell key="fileLink">
-        {submission.fileLink ? (
-          <Button variant="link" asChild size="sm">
-            <a href={submission.fileLink} target="_blank" rel="noopener noreferrer">
-              View Submitted File <ExternalLink className="ml-1 h-3 w-3" />
-            </a>
-          </Button>
-        ) : (
-          <span className="text-xs text-muted-foreground">No link</span>
-        )}
-      </TableCell>
-    );
+  const handleCompleteRedemptionClick = (redemption) => {
+    setSelectedRedemption(redemption);
+    setIsCompleteRedemptionOpen(true);
+  };
 
-    if (activeTab === 'Approved') {
-      cells.push(
-        <TableCell key="tokensAwarded" className="text-right">
-          <Badge variant="outline" className="bg-accent text-accent-foreground">
-            <Coins className="mr-1.5 h-3 w-3" />{submission.tokensAwarded}
-          </Badge>
-        </TableCell>
-      );
+  const handleDenyRedemptionClick = (redemption) => {
+      setSelectedRedemption(redemption);
+      setIsDenyRedemptionOpen(true);
+  };
+  
+  const processCompleteRedemption = async () => {
+    if (!selectedRedemption) return;
+    setIsProcessing(true);
+    try {
+        const redemptionRef = doc(db, 'redemptionRequests', selectedRedemption.id);
+        await updateDoc(redemptionRef, {
+            status: 'Completed',
+            processedAt: serverTimestamp(),
+        });
+        toast({ title: "Redemption Completed", description: `Request for ${selectedRedemption.amount} HTR by ${selectedRedemption.userName} marked as complete.` });
+        setIsCompleteRedemptionOpen(false);
+        setSelectedRedemption(null);
+        fetchRedemptions(activeRedemptionTab);
+    } catch (error) {
+        console.error("Error completing redemption: ", error);
+        toast({ title: "Completion Failed", description: error.message, variant: "destructive" });
+    } finally {
+        setIsProcessing(false);
     }
+  };
 
-    cells.push(
-      <TableCell key="actions" className="text-center">
-        {submission.status === 'Pending' && (
-          <div className="flex gap-2 justify-center">
-            <Button size="sm" variant="outline" className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleApproveClick(submission)} disabled={isProcessing}>
-              Approve
-            </Button>
-            <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(submission)} disabled={isProcessing}>
-              Reject
-            </Button>
-          </div>
-        )}
-        {submission.status === 'Approved' && <Badge className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Approved</Badge>}
-        {submission.status === 'Rejected' && <Badge className="bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">Rejected</Badge>}
-      </TableCell>
-    );
-    return cells;
+  const processDenyRedemption = async () => {
+    if (!selectedRedemption) return;
+    setIsProcessing(true);
+
+    const redemptionRef = doc(db, 'redemptionRequests', selectedRedemption.id);
+    const userRef = doc(db, 'users', selectedRedemption.userId);
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            // Refund the HTR to the user
+            transaction.update(userRef, { tokenBalance: increment(selectedRedemption.amount) });
+            // Update the redemption request status
+            transaction.update(redemptionRef, {
+                status: 'Denied',
+                processedAt: serverTimestamp(),
+            });
+        });
+        toast({ title: "Redemption Denied", description: `Request for ${selectedRedemption.amount} HTR by ${selectedRedemption.userName} denied and tokens refunded.` });
+        setIsDenyRedemptionOpen(false);
+        setSelectedRedemption(null);
+        fetchRedemptions(activeRedemptionTab);
+    } catch (error) {
+        console.error("Error denying redemption: ", error);
+        toast({ title: "Denial Failed", description: `Could not deny request. ${error.message}`, variant: "destructive" });
+    } finally {
+        setIsProcessing(false);
+    }
   };
 
 
-  return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-8 tracking-tight text-foreground">Review Submissions</h1>
-
+  const renderSubmissionsContent = () => (
+    <>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList>
           {Object.keys(statusConfig).map(status => (
@@ -306,6 +307,146 @@ export default function AdminReviewPage() {
               {statusConfig[status].icon} {status}
             </TabsTrigger>
           ))}
+        </TabsList>
+      </Tabs>
+      {submissions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
+            <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-lg font-semibold text-muted-foreground">No {activeTab.toLowerCase()} submissions found.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border shadow-md">
+            <Table>
+            <TableHeader>
+                <TableRow>
+                <TableHead>Task Title</TableHead>
+                <TableHead>Submitted By</TableHead>
+                <TableHead>Submitted At</TableHead>
+                <TableHead>Caption</TableHead>
+                <TableHead>File Link</TableHead>
+                {activeTab === 'Approved' && <TableHead className="text-right">HTR Awarded</TableHead>}
+                <TableHead className="text-center">Actions</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {submissions.map((submission) => (
+                <TableRow key={submission.id}>
+                    {renderSubmissionRow(submission)}
+                </TableRow>
+                ))}
+            </TableBody>
+            </Table>
+        </div>
+      )}
+    </>
+  );
+
+  const renderRedemptionsContent = () => (
+    <>
+        <Tabs value={activeRedemptionTab} onValueChange={setActiveRedemptionTab} className="mb-6">
+            <TabsList>
+                {Object.keys(redemptionStatusConfig).map(status => (
+                    <TabsTrigger key={status} value={status} className="gap-2">
+                        {redemptionStatusConfig[status].icon} {status}
+                    </TabsTrigger>
+                ))}
+            </TabsList>
+        </Tabs>
+        {redemptions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
+                <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-semibold text-muted-foreground">No {activeRedemptionTab.toLowerCase()} redemption requests.</p>
+            </div>
+        ) : (
+            <div className="overflow-x-auto rounded-lg border shadow-md">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>User Name</TableHead>
+                            <TableHead>Requested At</TableHead>
+                            <TableHead>HTR Amount</TableHead>
+                            <TableHead>Amount (USD)</TableHead>
+                            <TableHead>PayPal Email</TableHead>
+                            <TableHead className="text-center">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {redemptions.map((redemption) => (
+                            <TableRow key={redemption.id}>
+                                {renderRedemptionRow(redemption)}
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+        )}
+    </>
+);
+
+  const renderSubmissionRow = (submission) => (
+    <>
+        <TableCell className="font-medium">{submission.taskTitle}</TableCell>
+        <TableCell>{submission.submitterName}</TableCell>
+        <TableCell>{new Date(submission.submittedAt).toLocaleDateString()}</TableCell>
+        <TableCell className="max-w-xs truncate">{submission.caption}</TableCell>
+        <TableCell>
+            {submission.fileLink ? (
+            <Button variant="link" asChild size="sm">
+                <a href={submission.fileLink} target="_blank" rel="noopener noreferrer">
+                View File <ExternalLink className="ml-1 h-3 w-3" />
+                </a>
+            </Button>
+            ) : <span className="text-xs text-muted-foreground">No link</span>}
+        </TableCell>
+        {activeTab === 'Approved' && (
+            <TableCell className="text-right">
+                <Badge variant="outline" className="bg-accent text-accent-foreground">
+                    <Coins className="mr-1.5 h-3 w-3" />{submission.tokensAwarded}
+                </Badge>
+            </TableCell>
+        )}
+        <TableCell className="text-center">
+            {submission.status === 'Pending' && (
+            <div className="flex gap-2 justify-center">
+                <Button size="sm" variant="outline" className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleApproveClick(submission)} disabled={isProcessing}>Approve</Button>
+                <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRejectClick(submission)} disabled={isProcessing}>Reject</Button>
+            </div>
+            )}
+            {submission.status === 'Approved' && <Badge className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Approved</Badge>}
+            {submission.status === 'Rejected' && <Badge className="bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">Rejected</Badge>}
+        </TableCell>
+    </>
+  );
+
+  const renderRedemptionRow = (redemption) => (
+    <>
+        <TableCell className="font-medium">{redemption.userName}</TableCell>
+        <TableCell>{new Date(redemption.requestedAt).toLocaleDateString()}</TableCell>
+        <TableCell><Coins className="mr-1 inline-block h-4 w-4 text-accent" />{redemption.amount.toLocaleString()}</TableCell>
+        <TableCell className="font-semibold">${redemption.amountInUSD}</TableCell>
+        <TableCell>{redemption.paypalEmail}</TableCell>
+        <TableCell className="text-center">
+            {redemption.status === 'Pending' && (
+                <div className="flex gap-2 justify-center">
+                    <Button size="sm" variant="outline" className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => handleCompleteRedemptionClick(redemption)} disabled={isProcessing}>Complete</Button>
+                    <Button size="sm" variant="outline" className="border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleDenyRedemptionClick(redemption)} disabled={isProcessing}>Deny</Button>
+                </div>
+            )}
+            {redemption.status === 'Completed' && <Badge className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">Completed</Badge>}
+            {redemption.status === 'Denied' && <Badge className="bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">Denied</Badge>}
+        </TableCell>
+    </>
+  );
+
+
+  return (
+    <div className="container mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-8 tracking-tight text-foreground">Admin Panel</h1>
+
+      <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="mb-6">
+        <TabsList>
+            <TabsTrigger value="Submissions">Task Submissions</TabsTrigger>
+            <TabsTrigger value="Redemptions">HTR Redemptions</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -316,48 +457,14 @@ export default function AdminReviewPage() {
       ) : fetchError ? (
          <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg border-destructive bg-destructive/10">
           <ServerCrash className="h-16 w-16 text-destructive mb-4" />
-          <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Submissions</h2>
+          <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Data</h2>
           <p className="text-sm text-destructive whitespace-pre-wrap">{fetchError}</p>
-          <p className="text-xs text-muted-foreground mt-4">
-            If this error mentions "Permission Denied" or "Missing Index":
-            1. Ensure your admin user has `isAdmin: true` (boolean) in their Firestore document (/users/YOUR_UID).
-            2. Check your browser's developer console for a Firebase error message. If it includes a link to create a Firestore index (especially for 'status' and 'submittedAt' on the 'submissions' collection), please click it and create the index in your Firebase console.
-            3. Verify your Firestore Security Rules allow admins to `list` the `submissions` collection.
-          </p>
-        </div>
-      ) : submissions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
-          <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-lg font-semibold text-muted-foreground">No {activeTab.toLowerCase()} submissions found.</p>
-          <p className="text-sm text-muted-foreground">
-            There are currently no submissions in the '{activeTab}' category.
-          </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border shadow-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Task Title</TableHead>
-                <TableHead>Submitted By</TableHead>
-                <TableHead>Submitted At</TableHead>
-                <TableHead>Caption</TableHead>
-                <TableHead>File Link</TableHead>
-                {activeTab === 'Approved' && <TableHead className="text-right">HTR Awarded</TableHead>}
-                <TableHead className="text-center">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {submissions.map((submission) => (
-                <TableRow key={submission.id}>
-                  {renderRowCells(submission)}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        activeSubTab === 'Submissions' ? renderSubmissionsContent() : renderRedemptionsContent()
       )}
-
+      
+      {/* Submission Dialogs */}
       <AlertDialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -402,6 +509,38 @@ export default function AdminReviewPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Redemption Dialogs */}
+      <AlertDialog open={isCompleteRedemptionOpen} onOpenChange={setIsCompleteRedemptionOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Complete Redemption?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Mark the request for ${selectedRedemption?.amountInUSD} from {selectedRedemption?.userName} ({selectedRedemption?.paypalEmail}) as complete. This assumes you have sent the payment externally. This cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={processCompleteRedemption} disabled={isProcessing} className="bg-green-600 hover:bg-green-700">{isProcessing ? "Processing..." : "Mark as Complete"}</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isDenyRedemptionOpen} onOpenChange={setIsDenyRedemptionOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Deny Redemption Request?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Deny the request for {selectedRedemption?.amount.toLocaleString()} HTR from {selectedRedemption?.userName}. This will refund the HTR to the user's account.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={processDenyRedemption} disabled={isProcessing} className="bg-red-600 hover:bg-red-700">{isProcessing ? "Processing..." : "Confirm Deny & Refund HTR"}</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }

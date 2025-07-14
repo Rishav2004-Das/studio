@@ -15,7 +15,30 @@ import { useToast } from '@/hooks/use-toast.js';
 import { useAuth } from '@/contexts/auth-context.jsx';
 import { auth, db } from '@/lib/firebase/config.js'; 
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, runTransaction, addDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { Label } from '@/components/ui/label.jsx';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form.jsx';
+
+const redemptionSchema = z.object({
+  amount: z.coerce.number().int().positive({ message: 'Amount must be a positive number.' }).min(100, { message: 'Minimum redemption is 100 HTR.' }),
+  paypalEmail: z.string().email({ message: 'Please enter a valid PayPal email address.' }),
+});
+
 
 export default function ProfilePage() {
   const { toast } = useToast();
@@ -25,22 +48,33 @@ export default function ProfilePage() {
   const [submissions, setSubmissions] = useState([]);
   const [showLogin, setShowLogin] = useState(true);
   const [pageLoading, setPageLoading] = useState(true);
+  const [isRedeemOpen, setIsRedeemOpen] = useState(false);
+  const [isProcessingRedemption, setIsProcessingRedemption] = useState(false);
 
+  const redemptionForm = useForm({
+    resolver: zodResolver(redemptionSchema),
+    defaultValues: {
+      amount: '',
+      paypalEmail: '',
+    },
+  });
+
+  const fetchUserData = async (userId) => {
+      if (!userId) return;
+      const userDocRef = doc(db, 'users', userId);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        setLocalCurrentUser(userDocSnap.data());
+      } else {
+        setLocalCurrentUser(currentUser); 
+      }
+  };
 
   useEffect(() => {
     if (!authLoading) {
       setPageLoading(false);
       if (currentUser && currentUser.id) {
-        const fetchUserData = async () => {
-          const userDocRef = doc(db, 'users', currentUser.id);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            setLocalCurrentUser(userDocSnap.data());
-          } else {
-            setLocalCurrentUser(currentUser); 
-          }
-        };
-        fetchUserData();
+        fetchUserData(currentUser.id);
 
         const fetchSubmissions = async () => {
           try {
@@ -77,6 +111,67 @@ export default function ProfilePage() {
       }
     }
   }, [authLoading, currentUser, toast]);
+
+  const handleRedeemSubmit = async (data) => {
+    if (!localCurrentUser || !currentUser) {
+      toast({ title: "Error", description: "User not found.", variant: "destructive" });
+      return;
+    }
+    if (data.amount > localCurrentUser.tokenBalance) {
+      redemptionForm.setError("amount", { type: "manual", message: "You don't have enough HTR." });
+      return;
+    }
+    
+    setIsProcessingRedemption(true);
+
+    const userRef = doc(db, 'users', currentUser.id);
+    const redemptionRequestsRef = collection(db, 'redemptionRequests');
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) {
+          throw new Error("User document does not exist!");
+        }
+        const currentBalance = userDoc.data().tokenBalance;
+        if (data.amount > currentBalance) {
+          throw new Error("Insufficient funds for redemption.");
+        }
+        
+        const newBalance = currentBalance - data.amount;
+        transaction.update(userRef, { tokenBalance: newBalance });
+        
+        transaction.set(doc(redemptionRequestsRef), {
+          userId: currentUser.id,
+          userName: localCurrentUser.name,
+          userEmail: localCurrentUser.email,
+          amount: data.amount,
+          paypalEmail: data.paypalEmail,
+          status: 'Pending',
+          requestedAt: serverTimestamp(),
+        });
+      });
+      
+      toast({
+        title: "Redemption Request Submitted",
+        description: `Your request to redeem ${data.amount} HTR has been sent for processing.`,
+      });
+      
+      await fetchUserData(currentUser.id); // Refresh user data
+      setIsRedeemOpen(false);
+      redemptionForm.reset();
+
+    } catch (error) {
+      console.error("Redemption transaction failed: ", error);
+      toast({
+        title: "Redemption Failed",
+        description: error.message || "Could not process your redemption request. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingRedemption(false);
+    }
+  };
 
   const handleAuthSuccess = async () => {
     // AuthContext will update currentUser, which triggers the useEffect above
@@ -159,6 +254,7 @@ export default function ProfilePage() {
       <UserProfileCard
         user={localCurrentUser}
         isOwnProfile={true}
+        onRedeemClick={() => setIsRedeemOpen(true)}
       />
        <div className="mt-2 p-4 border border-dashed rounded-md bg-muted/50 text-center">
             <p className="text-sm text-muted-foreground">
@@ -199,6 +295,64 @@ export default function ProfilePage() {
           </p>
         </div>
       )}
+
+      {/* Redemption Dialog */}
+      <AlertDialog open={isRedeemOpen} onOpenChange={setIsRedeemOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Redeem HTR for Cash</AlertDialogTitle>
+            <AlertDialogDescription>
+              Convert your HTR into real money. 100 HTR = $1 USD.
+              Minimum redemption is 100 HTR. Payments are processed via PayPal.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Form {...redemptionForm}>
+            <form id="redemption-form" onSubmit={redemptionForm.handleSubmit(handleRedeemSubmit)} className="space-y-4">
+              <FormField
+                control={redemptionForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>HTR to Redeem (Balance: {localCurrentUser.tokenBalance.toLocaleString()})</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="e.g., 500" 
+                        {...field} 
+                        onChange={e => field.onChange(e.target.valueAsNumber)}
+                        max={localCurrentUser.tokenBalance}
+                        min="100"
+                        disabled={isProcessingRedemption}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={redemptionForm.control}
+                name="paypalEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PayPal Email Address</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="you@example.com" {...field} disabled={isProcessingRedemption} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessingRedemption} onClick={() => redemptionForm.reset()}>Cancel</AlertDialogCancel>
+            <AlertDialogAction type="submit" form="redemption-form" disabled={isProcessingRedemption}>
+              {isProcessingRedemption ? "Processing..." : "Submit Request"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
