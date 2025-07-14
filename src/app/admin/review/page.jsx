@@ -366,7 +366,8 @@ export default function AdminReviewPage() {
                             <TableHead>Requested At</TableHead>
                             <TableHead>HTR Amount</TableHead>
                             <TableHead>Amount (USD)</TableHead>
-                            <TableHead>PayPal Email</TableHead>
+                            <TableHead>Payment Method</TableHead>
+                            <TableHead>Payment Address</TableHead>
                             <TableHead className="text-center">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -424,7 +425,10 @@ export default function AdminReviewPage() {
         <TableCell>{new Date(redemption.requestedAt).toLocaleDateString()}</TableCell>
         <TableCell><Coins className="mr-1 inline-block h-4 w-4 text-accent" />{redemption.amount.toLocaleString()}</TableCell>
         <TableCell className="font-semibold">${redemption.amountInUSD}</TableCell>
-        <TableCell>{redemption.paypalEmail}</TableCell>
+        <TableCell>
+            <Badge variant={redemption.paymentMethod === 'upi' ? 'secondary' : 'default'} className="uppercase text-xs">{redemption.paymentMethod}</Badge>
+        </TableCell>
+        <TableCell>{redemption.paymentAddress}</TableCell>
         <TableCell className="text-center">
             {redemption.status === 'Pending' && (
                 <div className="flex gap-2 justify-center">
@@ -516,7 +520,7 @@ export default function AdminReviewPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Complete Redemption Request?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Have you manually sent ${selectedRedemption?.amountInUSD} to {selectedRedemption?.userName} via PayPal ({selectedRedemption?.paypalEmail})? This action will mark the request as complete and cannot be undone.
+                  This confirms you have manually sent ${selectedRedemption?.amountInUSD} to {selectedRedemption?.userName} via {selectedRedemption?.paymentMethod.toUpperCase()} at the address: <span className="font-mono bg-muted p-1 rounded-sm">{selectedRedemption?.paymentAddress}</span>. This action marks the request as complete and cannot be undone.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

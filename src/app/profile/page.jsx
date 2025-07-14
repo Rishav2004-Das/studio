@@ -28,15 +28,35 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog.jsx';
 import { Input } from '@/components/ui/input.jsx';
-import { Label } from '@/components/ui/label.jsx';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group.jsx';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form.jsx';
 
+const upiRegex = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
+
 const redemptionSchema = z.object({
   amount: z.coerce.number().int().positive({ message: 'Amount must be a positive number.' }).min(100, { message: 'Minimum redemption is 100 HTR.' }),
-  paypalEmail: z.string().email({ message: 'Please enter a valid PayPal email address.' }),
+  paymentMethod: z.enum(['paypal', 'upi'], { required_error: 'You must select a payment method.' }),
+  paypalEmail: z.string().email({ message: 'Please enter a valid PayPal email address.' }).optional().or(z.literal('')),
+  upiId: z.string().regex(upiRegex, { message: 'Please enter a valid UPI ID (e.g., yourname@bank).' }).optional().or(z.literal('')),
+}).refine(data => {
+    if (data.paymentMethod === 'paypal') {
+        return !!data.paypalEmail;
+    }
+    return true;
+}, {
+    message: 'PayPal email is required.',
+    path: ['paypalEmail'],
+}).refine(data => {
+    if (data.paymentMethod === 'upi') {
+        return !!data.upiId;
+    }
+    return true;
+}, {
+    message: 'UPI ID is required.',
+    path: ['upiId'],
 });
 
 
@@ -55,9 +75,14 @@ export default function ProfilePage() {
     resolver: zodResolver(redemptionSchema),
     defaultValues: {
       amount: '',
+      paymentMethod: 'paypal',
       paypalEmail: '',
+      upiId: '',
     },
   });
+  
+  const paymentMethodWatcher = redemptionForm.watch('paymentMethod');
+
 
   const fetchUserData = async (userId) => {
       if (!userId) return;
@@ -141,15 +166,18 @@ export default function ProfilePage() {
         const newBalance = currentBalance - data.amount;
         transaction.update(userRef, { tokenBalance: newBalance });
         
-        transaction.set(doc(redemptionRequestsRef), {
+        const redemptionData = {
           userId: currentUser.id,
           userName: localCurrentUser.name,
           userEmail: localCurrentUser.email,
           amount: data.amount,
-          paypalEmail: data.paypalEmail,
+          paymentMethod: data.paymentMethod,
+          paymentAddress: data.paymentMethod === 'paypal' ? data.paypalEmail : data.upiId,
           status: 'Pending',
           requestedAt: serverTimestamp(),
-        });
+        };
+
+        transaction.set(doc(redemptionRequestsRef), redemptionData);
       });
       
       toast({
@@ -303,7 +331,7 @@ export default function ProfilePage() {
             <AlertDialogTitle>Redeem HTR for Cash</AlertDialogTitle>
             <AlertDialogDescription>
               Convert your HTR into real money. 100 HTR = $1 USD.
-              Minimum redemption is 100 HTR. Payments are processed via PayPal.
+              Minimum redemption is 100 HTR. Payments are processed via PayPal or UPI.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Form {...redemptionForm}>
@@ -329,19 +357,74 @@ export default function ProfilePage() {
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={redemptionForm.control}
-                name="paypalEmail"
+                name="paymentMethod"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>PayPal Email Address</FormLabel>
+                  <FormItem className="space-y-3">
+                    <FormLabel>Payment Method</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="you@example.com" {...field} disabled={isProcessingRedemption} />
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="flex flex-col space-y-1"
+                        disabled={isProcessingRedemption}
+                      >
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="paypal" />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            PayPal
+                          </FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="upi" />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            UPI (for India)
+                          </FormLabel>
+                        </FormItem>
+                      </RadioGroup>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {paymentMethodWatcher === 'paypal' && (
+                <FormField
+                  control={redemptionForm.control}
+                  name="paypalEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PayPal Email Address</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="you@example.com" {...field} disabled={isProcessingRedemption} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {paymentMethodWatcher === 'upi' && (
+                <FormField
+                  control={redemptionForm.control}
+                  name="upiId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>UPI ID</FormLabel>
+                      <FormControl>
+                        <Input type="text" placeholder="yourname@bank" {...field} disabled={isProcessingRedemption} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </form>
           </Form>
           <AlertDialogFooter>
