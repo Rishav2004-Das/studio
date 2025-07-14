@@ -61,17 +61,11 @@ export default function AdminReviewPage() {
   const [tokensToAward, setTokensToAward] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
-  const [fetchErrorToastShown, setFetchErrorToastShown] = useState(false);
   const [selectedRedemption, setSelectedRedemption] = useState(null);
   const [isCompleteRedemptionOpen, setIsCompleteRedemptionOpen] = useState(false);
   const [isDenyRedemptionOpen, setIsDenyRedemptionOpen] = useState(false);
 
   const fetchSubmissions = useCallback(async (statusToFetch) => {
-    // ... (rest of the function is the same, just wrapped in this useCallback)
-    if (!currentUser || !currentUser.isAdmin) {
-      // ...
-      return;
-    }
     setPageIsLoading(true);
     setFetchError(null);
     setSubmissions([]);
@@ -95,12 +89,9 @@ export default function AdminReviewPage() {
     } finally {
       setPageIsLoading(false);
     }
-  }, [currentUser, toast]);
+  }, []);
 
   const fetchRedemptions = useCallback(async (statusToFetch) => {
-    if (!currentUser || !currentUser.isAdmin) {
-      return;
-    }
     setPageIsLoading(true);
     setFetchError(null);
     setRedemptions([]);
@@ -124,30 +115,31 @@ export default function AdminReviewPage() {
     } finally {
         setPageIsLoading(false);
     }
-  }, [currentUser, toast]);
+  }, []);
 
 
   useEffect(() => {
-    if (!authContextIsLoading && currentUser && currentUser.isAdmin) {
-        setFetchErrorToastShown(false);
-        if (activeSubTab === 'Submissions') {
-            fetchSubmissions(activeTab);
-        } else if (activeSubTab === 'Redemptions') {
-            fetchRedemptions(activeRedemptionTab);
-        }
-    } else if (!authContextIsLoading && (!currentUser || !currentUser.isAdmin)) {
-        const accessDeniedMsg = "Access Denied: You are not authorized to view this page.";
-        setFetchError(accessDeniedMsg);
-        setPageIsLoading(false);
-        setSubmissions([]);
-        setRedemptions([]);
-    } else {
-        setPageIsLoading(true);
-        setFetchError(null);
+    if (authContextIsLoading) {
+      setPageIsLoading(true);
+      return;
+    }
+
+    if (!currentUser || !currentUser.isAdmin) {
+      const accessDeniedMsg = "Access Denied: You are not authorized to view this page.";
+      setFetchError(accessDeniedMsg);
+      setPageIsLoading(false);
+      setSubmissions([]);
+      setRedemptions([]);
+      return;
+    }
+    
+    if (activeSubTab === 'Submissions') {
+      fetchSubmissions(activeTab);
+    } else if (activeSubTab === 'Redemptions') {
+      fetchRedemptions(activeRedemptionTab);
     }
   }, [activeSubTab, activeTab, activeRedemptionTab, currentUser, authContextIsLoading, fetchSubmissions, fetchRedemptions]);
 
-  // All handler and processing functions (approve, reject) remain the same
 
   const handleApproveClick = (submission) => {
     setSelectedSubmission(submission);
