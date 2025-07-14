@@ -1,58 +1,95 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is an admin
-    function isAdmin() {
-      // Check the 'isAdmin' flag on the user's document in the 'users' collection
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    // 📁 Users Collection
+    match /users/{userIdInPath} {
+
+      // ✅ Read: user can read their own data OR if requester is admin
+      allow read: if request.auth != null &&
+        (
+          request.auth.uid == userIdInPath ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+        );
+
+      // ✅ Update:
+      // - User can update their own document (except isAdmin)
+      // - Admins can only update tokenBalance field
+      allow update: if request.auth != null &&
+        (
+          (
+            request.auth.uid == userIdInPath &&
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin'])
+          ) ||
+          (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tokenBalance'])
+          )
+        );
+
+      // ✅ Create: user can create their own doc (isAdmin must not be true)
+      allow create: if request.auth != null &&
+        request.auth.uid == userIdInPath &&
+        (
+          request.resource.data.isAdmin == null ||
+          request.resource.data.isAdmin == false
+        );
+
+      // ✅ List: only admins can list users
+      allow list: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+
+      // ✅ Delete: only the user can delete their own document
+      allow delete: if request.auth != null &&
+        request.auth.uid == userIdInPath;
     }
 
-    // Rules for the 'users' collection
-    match /users/{userId} {
-      // Anyone can create their own user document (on signup)
-      allow create: if request.auth.uid == userId;
-      
-      // Users can read their own data. Admins can read anyone's data.
-      allow read: if request.auth.uid == userId || isAdmin();
-      
-      // Users can only update their own data, but cannot make themselves an admin
-      allow update: if request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']);
-      
-      // Users can delete their own account
-      allow delete: if request.auth.uid == userId;
-    }
-
-    // Rules for the 'submissions' collection
+    // 📁 Submissions Collection
     match /submissions/{submissionId} {
-      // Any authenticated user can create a submission, as long as it's for themselves
-      allow create: if request.auth.uid == request.resource.data.userId;
 
-      // Users can read their own submissions. Admins can read all submissions.
-      allow read: if request.auth.uid == resource.data.userId || isAdmin();
-      
-      // Only admins can update submissions (e.g., to approve/reject)
-      allow update: if isAdmin();
-      
-      // Users can delete their own submissions (for account deletion)
-      allow delete: if request.auth.uid == resource.data.userId;
+      // ✅ Read: owner of submission OR admin
+      allow read: if request.auth != null &&
+        (
+          resource.data.userId == request.auth.uid ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+        );
+
+      // ✅ Update: only admins can update
+      allow update: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+
+      // ✅ Create: user can create their own submissions
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+
+      // ✅ Delete: owner OR admin can delete
+      allow delete: if request.auth != null &&
+        (
+          resource.data.userId == request.auth.uid ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+        );
+
+      // ✅ List: only admins can list submissions
+      allow list: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
-    
-    // Rules for the 'redemptionRequests' collection
-    match /redemptionRequests/{requestId} {
-        // Any authenticated user can create a redemption request for themselves
-        allow create: if request.auth.uid == request.resource.data.userId;
-        
-        // Users can't read redemption requests directly. Only admins can.
-        // This is a security measure to prevent users from seeing others' requests.
-        allow read: if isAdmin();
-        
-        // Only admins can update redemption requests (to complete/deny them)
-        allow update: if isAdmin();
-        
-        // No one can delete redemption requests to maintain a record
-        allow delete: if false;
+
+    // 📁 Redemption Requests Collection
+    match /redemptionRequests/{redemptionId} {
+
+        // ✅ Read, Update, Delete: Only admins can perform these actions.
+        allow read, update, delete: if request.auth != null &&
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+
+        // ✅ Create: An authenticated user can create their own redemption request.
+        allow create: if request.auth != null &&
+            request.resource.data.userId == request.auth.uid;
+
+        // ✅ List: Only admins can list all redemption requests.
+        allow list: if request.auth != null &&
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
   }
 }
