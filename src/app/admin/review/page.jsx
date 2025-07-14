@@ -49,7 +49,7 @@ export default function AdminReviewPage() {
   const [redemptions, setRedemptions] = useState([]);
   const [isPageLoading, setPageIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Pending'); // For submissions
-  const [activeSubTab, setActiveSubTab] = useState('Pending'); // For main tabs (Submissions vs Redemptions)
+  const [activeSubTab, setActiveSubTab] = useState('Submissions'); // For main tabs (Submissions vs Redemptions)
   const [activeRedemptionTab, setActiveRedemptionTab] = useState('Pending'); // For redemptions
 
   const { toast } = useToast();
@@ -514,14 +514,14 @@ export default function AdminReviewPage() {
       <AlertDialog open={isCompleteRedemptionOpen} onOpenChange={setIsCompleteRedemptionOpen}>
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle>Complete Redemption?</AlertDialogTitle>
+                <AlertDialogTitle>Complete Redemption Request?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Mark the request for ${selectedRedemption?.amountInUSD} from {selectedRedemption?.userName} ({selectedRedemption?.paypalEmail}) as complete. This assumes you have sent the payment externally. This cannot be undone.
+                  Have you manually sent ${selectedRedemption?.amountInUSD} to {selectedRedemption?.userName} via PayPal ({selectedRedemption?.paypalEmail})? This action will mark the request as complete and cannot be undone.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={processCompleteRedemption} disabled={isProcessing} className="bg-green-600 hover:bg-green-700">{isProcessing ? "Processing..." : "Mark as Complete"}</AlertDialogAction>
+                <AlertDialogAction onClick={processCompleteRedemption} disabled={isProcessing} className="bg-green-600 hover:bg-green-700">{isProcessing ? "Processing..." : "Yes, I have paid"}</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
