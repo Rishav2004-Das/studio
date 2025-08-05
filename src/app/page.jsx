@@ -43,7 +43,7 @@ export default function HomePage() {
         const q = query(
           submissionsCol,
           where('status', '==', 'Approved'),
-          orderBy('reviewedAt', 'desc')
+          orderBy('submittedAt', 'desc')
         );
         const querySnapshot = await getDocs(q);
         const approvedSubmissions = querySnapshot.docs.map(doc => ({
@@ -136,7 +136,7 @@ export default function HomePage() {
                 </Link>
               ))}
               <Button asChild variant="outline" className="w-full">
-                <Link href="/">View All Tasks</Link>
+                <Link href="/tasks">View All Tasks</Link>
               </Button>
             </div>
           </div>
