@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase/config';
 import { collection, query, orderBy, limit, getDocs, where, getCountFromServer } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -29,10 +29,21 @@ export default function LeaderboardPage() {
     // Search state
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearching, setIsSearching] = useState(false);
-    const [searchedUser, setSearchedUser] = useState(null); // Will store the full user object if found
+    const [searchedUser, setSearchedUser] = useState(null);
     const [searchError, setSearchError] = useState(null);
     const [searchedUserId, setSearchedUserId] = useState(null);
 
+    // Ref for scrolling
+    const userRowRefs = useRef({});
+
+    useEffect(() => {
+        if (searchedUserId && userRowRefs.current[searchedUserId]) {
+            userRowRefs.current[searchedUserId].scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            });
+        }
+    }, [searchedUserId, topUsers, searchedUser]); // Rerun when search completes
 
     useEffect(() => {
         const fetchTopUsers = async () => {
@@ -73,6 +84,7 @@ export default function LeaderboardPage() {
         setSearchError(null);
         setSearchedUser(null);
         setSearchedUserId(null);
+        userRowRefs.current = {}; // Clear previous refs
 
         try {
             const usersCol = collection(db, 'users');
@@ -87,15 +99,13 @@ export default function LeaderboardPage() {
             const userDoc = userSnapshot.docs[0];
             const userData = userDoc.data();
             const userTokenBalance = userData.tokenBalance;
-            setSearchedUserId(userDoc.id); // Highlight user if already in top 10
+            setSearchedUserId(userDoc.id);
 
-            // Check if user is already in the topUsers list
             const userInTopList = topUsers.find(u => u.id === userDoc.id);
             if (userInTopList) {
-                return; // No need to fetch rank again, just highlight
+                return; 
             }
 
-            // If not in top list, calculate rank and add them
             const rankQuery = query(usersCol, where('tokenBalance', '>', userTokenBalance));
             const higherRankedSnapshot = await getCountFromServer(rankQuery);
             const rank = higherRankedSnapshot.data().count + 1;
@@ -146,6 +156,7 @@ export default function LeaderboardPage() {
     const renderUserRow = (user) => (
         <TableRow 
             key={user.id}
+            ref={(el) => (userRowRefs.current[user.id] = el)}
             className={cn(searchedUserId === user.id && "bg-primary/10 border-l-4 border-l-primary")}
         >
             <TableCell className="text-center text-lg font-bold">{getMedal(user.rank)}</TableCell>
@@ -275,5 +286,3 @@ export default function LeaderboardPage() {
         </div>
     );
 }
-
-    
