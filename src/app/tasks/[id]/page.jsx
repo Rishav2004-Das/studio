@@ -1,4 +1,5 @@
 
+
 import { getTaskById, getIconComponent } from "@/lib/mock-data.js";
 import { notFound } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card.jsx";
@@ -24,12 +25,14 @@ export async function generateMetadata({ params }) {
   };
 }
 
-export async function generateStaticParams() {
-  const { mockTasks } = await import("@/lib/mock-data.js");
-  return mockTasks.map((task) => ({
-    id: task.id,
-  }));
-}
+// This function is commented out to allow for dynamic rendering of tasks
+// as the mock file might not represent all tasks in a real scenario.
+// export async function generateStaticParams() {
+//   const { mockTasks } = await import("@/lib/mock-data.js");
+//   return mockTasks.map((task) => ({
+//     id: task.id,
+//   }));
+// }
 
 export default async function TaskDetailPage({ params }) {
   const resolvedParams = await params;
@@ -48,7 +51,7 @@ export default async function TaskDetailPage({ params }) {
         <Button variant="outline" asChild>
           <Link href="/">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Tasks
+            Back to Home
           </Link>
         </Button>
       </div>
@@ -72,7 +75,7 @@ export default async function TaskDetailPage({ params }) {
             <CardContent className="p-6">
               <div className="mb-1 flex items-center text-lg font-semibold text-accent">
                 <Award className="mr-2 h-6 w-6" />
-                <span>Earn {task.tokens} HTR</span>
+                <span>Earn up to {task.tokens} HTR</span>
               </div>
               <p className="text-xs text-muted-foreground mb-6">
                 Please note: HTR awards are based on submission quality and admin review. The final HTR awarded may be adjusted.
