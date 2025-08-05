@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase/config.js';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { mockTasks } from "@/lib/mock-data.js";
 import { Skeleton } from '@/components/ui/skeleton.jsx';
 import { LayoutGrid, Rss, Megaphone } from 'lucide-react';
@@ -46,10 +46,15 @@ export default function HomePage() {
           orderBy('submittedAt', 'desc')
         );
         const querySnapshot = await getDocs(q);
-        const approvedSubmissions = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const approvedSubmissions = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            // Ensure submittedAt is a JS Date object for consistent handling
+            submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : new Date(data.submittedAt || Date.now())
+          }
+        });
         setFeedItems(approvedSubmissions);
       } catch (err) {
         console.error("Error fetching feed:", err);
