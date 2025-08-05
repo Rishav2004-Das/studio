@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase/config.js';
-import { collection, query, where, getDocs, doc, updateDoc, runTransaction, orderBy, Timestamp, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, runTransaction, orderBy, Timestamp, increment, serverTimestamp, addDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast.js';
 import { Button } from '@/components/ui/button.jsx';
 import {
@@ -28,9 +28,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog.jsx';
 import { Input } from '@/components/ui/input.jsx';
+import { Textarea } from '@/components/ui/textarea.jsx';
 import { Label } from '@/components/ui/label.jsx';
-import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Hourglass, Coins, ServerCrash, DollarSign, Ban } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Hourglass, Coins, ServerCrash, DollarSign, Ban, Megaphone, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context.jsx';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card.jsx';
 
 const statusConfig = {
   Pending: { color: "bg-yellow-500 hover:bg-yellow-600", icon: <Hourglass className="mr-2 h-4 w-4" /> },
@@ -47,23 +49,35 @@ const redemptionStatusConfig = {
 export default function AdminReviewPage() {
   const [submissions, setSubmissions] = useState([]);
   const [redemptions, setRedemptions] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [isPageLoading, setPageIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Pending'); // For submissions
-  const [activeSubTab, setActiveSubTab] = useState('Submissions'); // For main tabs (Submissions vs Redemptions)
+  const [activeSubTab, setActiveSubTab] = useState('Submissions'); // For main tabs (Submissions vs Redemptions vs Announcements)
   const [activeRedemptionTab, setActiveRedemptionTab] = useState('Pending'); // For redemptions
 
   const { toast } = useToast();
   const { currentUser, isLoading: authContextIsLoading } = useAuth();
 
+  // Submission State
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [tokensToAward, setTokensToAward] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+
+  // Redemption State
   const [selectedRedemption, setSelectedRedemption] = useState(null);
   const [isCompleteRedemptionOpen, setIsCompleteRedemptionOpen] = useState(false);
   const [isDenyRedemptionOpen, setIsDenyRedemptionOpen] = useState(false);
+  
+  // Announcement State
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementContent, setAnnouncementContent] = useState('');
+  const [isCreatingAnnouncement, setIsCreatingAnnouncement] = useState(false);
+  const [isDeletingAnnouncement, setIsDeletingAnnouncement] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+  const [isDeleteAnnouncementOpen, setIsDeleteAnnouncementOpen] = useState(false);
 
   const fetchSubmissions = useCallback(async (statusToFetch) => {
     setPageIsLoading(true);
@@ -117,6 +131,30 @@ export default function AdminReviewPage() {
     }
   }, []);
 
+  const fetchAnnouncements = useCallback(async () => {
+    setPageIsLoading(true);
+    setFetchError(null);
+    setAnnouncements([]);
+    try {
+        const announcementsCol = collection(db, 'announcements');
+        const q = query(announcementsCol, orderBy('createdAt', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const fetchedAnnouncements = querySnapshot.docs.map(docSnapshot => {
+            const data = docSnapshot.data();
+            return {
+                id: docSnapshot.id,
+                ...data,
+                createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()),
+            };
+        });
+        setAnnouncements(fetchedAnnouncements);
+    } catch (error) {
+        console.error(`[AdminReviewPage] Error fetching announcements: `, error);
+        setFetchError(`Error fetching announcements. Check console for details, especially for missing Firestore indexes.`);
+    } finally {
+        setPageIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (authContextIsLoading) {
@@ -130,6 +168,7 @@ export default function AdminReviewPage() {
       setPageIsLoading(false);
       setSubmissions([]);
       setRedemptions([]);
+      setAnnouncements([]);
       return;
     }
     
@@ -137,8 +176,10 @@ export default function AdminReviewPage() {
       fetchSubmissions(activeTab);
     } else if (activeSubTab === 'Redemptions') {
       fetchRedemptions(activeRedemptionTab);
+    } else if (activeSubTab === 'Announcements') {
+      fetchAnnouncements();
     }
-  }, [activeSubTab, activeTab, activeRedemptionTab, currentUser, authContextIsLoading, fetchSubmissions, fetchRedemptions]);
+  }, [activeSubTab, activeTab, activeRedemptionTab, currentUser, authContextIsLoading, fetchSubmissions, fetchRedemptions, fetchAnnouncements]);
 
 
   const handleApproveClick = (submission) => {
@@ -228,7 +269,6 @@ export default function AdminReviewPage() {
     }
   };
 
-
   const handleCompleteRedemptionClick = (redemption) => {
     setSelectedRedemption(redemption);
     setIsCompleteRedemptionOpen(true);
@@ -269,9 +309,7 @@ export default function AdminReviewPage() {
 
     try {
         await runTransaction(db, async (transaction) => {
-            // Refund the HTR to the user
             transaction.update(userRef, { tokenBalance: increment(selectedRedemption.amount) });
-            // Update the redemption request status
             transaction.update(redemptionRef, {
                 status: 'Denied',
                 processedAt: serverTimestamp(),
@@ -286,6 +324,56 @@ export default function AdminReviewPage() {
         toast({ title: "Denial Failed", description: `Could not deny request. ${error.message}`, variant: "destructive" });
     } finally {
         setIsProcessing(false);
+    }
+  };
+
+  const handleCreateAnnouncement = async (e) => {
+    e.preventDefault();
+    if (!announcementTitle.trim() || !announcementContent.trim()) {
+      toast({ title: "Missing Fields", description: "Title and content are required.", variant: "destructive" });
+      return;
+    }
+    setIsCreatingAnnouncement(true);
+    try {
+      const announcementsCol = collection(db, 'announcements');
+      await addDoc(announcementsCol, {
+        title: announcementTitle,
+        content: announcementContent,
+        createdAt: serverTimestamp(),
+        authorId: currentUser.id,
+      });
+      toast({ title: "Success", description: "Announcement has been published." });
+      setAnnouncementTitle('');
+      setAnnouncementContent('');
+      fetchAnnouncements();
+    } catch (error) {
+      console.error("Error creating announcement: ", error);
+      toast({ title: "Creation Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsCreatingAnnouncement(false);
+    }
+  };
+
+  const handleDeleteAnnouncementClick = (announcement) => {
+    setSelectedAnnouncement(announcement);
+    setIsDeleteAnnouncementOpen(true);
+  };
+  
+  const processDeleteAnnouncement = async () => {
+    if (!selectedAnnouncement) return;
+    setIsDeletingAnnouncement(true);
+    try {
+        const announcementRef = doc(db, 'announcements', selectedAnnouncement.id);
+        await deleteDoc(announcementRef);
+        toast({ title: "Announcement Deleted", description: "The announcement has been permanently deleted." });
+        setIsDeleteAnnouncementOpen(false);
+        setSelectedAnnouncement(null);
+        fetchAnnouncements();
+    } catch (error) {
+        console.error("Error deleting announcement: ", error);
+        toast({ title: "Deletion Failed", description: error.message, variant: "destructive" });
+    } finally {
+        setIsDeletingAnnouncement(false);
     }
   };
 
@@ -374,7 +462,81 @@ export default function AdminReviewPage() {
             </div>
         )}
     </>
-);
+  );
+
+  const renderAnnouncementsContent = () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-1">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Create Announcement</CardTitle>
+                    <CardDescription>Publish a new announcement to all users.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+                        <div>
+                            <Label htmlFor="announcement-title">Title</Label>
+                            <Input 
+                                id="announcement-title"
+                                value={announcementTitle}
+                                onChange={(e) => setAnnouncementTitle(e.target.value)}
+                                placeholder="e.g., New Feature!"
+                                disabled={isCreatingAnnouncement}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="announcement-content">Content</Label>
+                            <Textarea
+                                id="announcement-content"
+                                value={announcementContent}
+                                onChange={(e) => setAnnouncementContent(e.target.value)}
+                                placeholder="Write your announcement details here."
+                                disabled={isCreatingAnnouncement}
+                                rows={5}
+                            />
+                        </div>
+                        <Button type="submit" disabled={isCreatingAnnouncement} className="w-full">
+                            {isCreatingAnnouncement ? "Publishing..." : "Publish Announcement"}
+                        </Button>
+                    </form>
+                </CardContent>
+            </Card>
+        </div>
+        <div className="md:col-span-2">
+            <h3 className="text-xl font-semibold mb-4">Existing Announcements</h3>
+            {announcements.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg">
+                    <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-lg font-semibold text-muted-foreground">No announcements found.</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {announcements.map(announcement => (
+                        <Card key={announcement.id} className="relative group">
+                            <CardHeader>
+                                <CardTitle>{announcement.title}</CardTitle>
+                                <CardDescription>
+                                    Published on {announcement.createdAt.toLocaleDateString()}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-sm text-foreground/80">{announcement.content}</p>
+                            </CardContent>
+                             <Button
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleDeleteAnnouncementClick(announcement)}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </Card>
+                    ))}
+                </div>
+            )}
+        </div>
+    </div>
+  );
 
   const renderSubmissionRow = (submission) => (
     <>
@@ -434,6 +596,35 @@ export default function AdminReviewPage() {
     </>
   );
 
+  const renderContent = () => {
+      if (isPageLoading) {
+        return (
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+            </div>
+        );
+      }
+      if (fetchError) {
+        return (
+             <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg border-destructive bg-destructive/10">
+              <ServerCrash className="h-16 w-16 text-destructive mb-4" />
+              <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Data</h2>
+              <p className="text-sm text-destructive whitespace-pre-wrap">{fetchError}</p>
+            </div>
+        );
+      }
+      switch (activeSubTab) {
+          case 'Submissions':
+              return renderSubmissionsContent();
+          case 'Redemptions':
+              return renderRedemptionsContent();
+          case 'Announcements':
+              return renderAnnouncementsContent();
+          default:
+              return null;
+      }
+  };
+
 
   return (
     <div className="container mx-auto py-8">
@@ -443,22 +634,11 @@ export default function AdminReviewPage() {
         <TabsList>
             <TabsTrigger value="Submissions">Task Submissions</TabsTrigger>
             <TabsTrigger value="Redemptions">HTR Redemptions</TabsTrigger>
+            <TabsTrigger value="Announcements"><Megaphone className="mr-2 h-4 w-4" /> Announcements</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {isPageLoading ? (
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
-        </div>
-      ) : fetchError ? (
-         <div className="flex flex-col items-center justify-center text-center p-10 border-2 border-dashed rounded-lg border-destructive bg-destructive/10">
-          <ServerCrash className="h-16 w-16 text-destructive mb-4" />
-          <h2 className="text-2xl font-bold text-destructive mb-2">Error Loading Data</h2>
-          <p className="text-sm text-destructive whitespace-pre-wrap">{fetchError}</p>
-        </div>
-      ) : (
-        activeSubTab === 'Submissions' ? renderSubmissionsContent() : renderRedemptionsContent()
-      )}
+      {renderContent()}
       
       {/* Submission Dialogs */}
       <AlertDialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
@@ -535,6 +715,24 @@ export default function AdminReviewPage() {
                 <AlertDialogAction onClick={processDenyRedemption} disabled={isProcessing} className="bg-red-600 hover:bg-red-700">{isProcessing ? "Processing..." : "Confirm Deny & Refund HTR"}</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Announcement Dialogs */}
+      <AlertDialog open={isDeleteAnnouncementOpen} onOpenChange={setIsDeleteAnnouncementOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Announcement?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      Are you sure you want to delete the announcement titled &quot;{selectedAnnouncement?.title}&quot;? This action is permanent.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isDeletingAnnouncement}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={processDeleteAnnouncement} disabled={isDeletingAnnouncement} className="bg-red-600 hover:bg-red-700">
+                      {isDeletingAnnouncement ? "Deleting..." : "Confirm Delete"}
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
       </AlertDialog>
 
     </div>
