@@ -34,7 +34,6 @@ export default function HomePage() {
   const [feedItems, setFeedItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
     const fetchFeed = async () => {
@@ -65,17 +64,12 @@ export default function HomePage() {
       }
     };
 
-    // Only fetch feed if the user is authenticated and auth state is resolved.
-    if (!authLoading && isAuthenticated) {
-        fetchFeed();
-    } else {
-        setIsLoading(false); // If not authenticated, stop loading.
-    }
+    fetchFeed();
 
-  }, [isAuthenticated, authLoading]);
+  }, []);
 
   const renderFeedContent = () => {
-    if (authLoading || isLoading) {
+    if (isLoading) {
       return (
         <div className="space-y-6">
           <Skeleton className="h-64 w-full rounded-lg" />
@@ -83,21 +77,6 @@ export default function HomePage() {
           <Skeleton className="h-64 w-full rounded-lg" />
         </div>
       );
-    }
-    
-    if (!isAuthenticated) {
-        return (
-             <div className="text-center rounded-lg border-2 border-dashed p-12 flex flex-col items-center">
-                <Lock className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-lg font-semibold text-muted-foreground">Community Feed is Private</p>
-                <p className="mt-2 text-muted-foreground">
-                    Please log in or sign up to see what the community is up to!
-                </p>
-                 <Button asChild className="mt-4">
-                    <Link href="/profile">Log In / Sign Up</Link>
-                </Button>
-            </div>
-        )
     }
 
     if (error) {
