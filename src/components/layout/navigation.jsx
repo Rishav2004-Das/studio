@@ -67,8 +67,7 @@ export function Navigation() {
       {itemsToDisplay.map((item) => (
         <SidebarMenuItem key={item.title}>
           <SidebarMenuButton
-            as={Link}
-            href={item.href}
+            asChild
             className={cn(
               "w-full justify-start",
               getIsActive(item.href)
@@ -78,8 +77,10 @@ export function Navigation() {
             isActive={getIsActive(item.href)}
             tooltip={{ children: item.title, side: "right", align: "center" }}
           >
-            <item.icon className="mr-2 h-5 w-5" />
-            <span className="truncate">{item.title}</span>
+            <Link href={item.href}>
+              <item.icon className="mr-2 h-5 w-5" />
+              <span className="truncate">{item.title}</span>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
       ))}
