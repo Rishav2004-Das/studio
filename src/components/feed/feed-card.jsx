@@ -30,6 +30,11 @@ export function FeedCard({ submission }) {
   });
   const [isProcessingLike, setIsProcessingLike] = useState(false);
 
+  // Fallback for missing submission timestamp
+  if (!submission.submittedAt) {
+    return null; // Don't render the card if the timestamp is missing, preventing crashes.
+  }
+
   const fallbackInitials = submission.submitterName?.split(' ').map(n => n[0]).join('').toUpperCase() || <UserCircle2 />;
 
   const handleLikeClick = async () => {

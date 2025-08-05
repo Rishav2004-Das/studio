@@ -23,6 +23,10 @@ const statusColors = {
 export function SubmissionHistoryItem({ submission, taskTitle }) {
   const currentStatus = submission.status || "Pending"; // Default to Pending if status is undefined
 
+  if (!submission.submittedAt) {
+    return null; // Don't render if the timestamp is missing.
+  }
+  
   return (
     <Card className="overflow-hidden shadow-md transition-shadow hover:shadow-lg">
       <CardContent className="p-4">
