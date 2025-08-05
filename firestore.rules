@@ -48,22 +48,16 @@ service cloud.firestore {
     // 📁 Submissions Collection
     match /submissions/{submissionId} {
 
-      // ✅ Read: owner of submission OR admin
-      allow read: if request.auth != null &&
-        (
-          resource.data.userId == request.auth.uid ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
-        );
-
-      // ✅ Update:
-      // - Admins can update any field.
-      // - Authenticated users can update ONLY the 'likes' and 'likers' fields.
+      // ✅ Read & List: ANYONE can read/list submissions (for public feed)
+      allow read, list: if true;
+      
+      // ✅ Update: 
+      // - Admins can update any field (for review)
+      // - Any authenticated user can update ONLY the 'likes' and 'likers' fields
       allow update: if request.auth != null &&
         (
-          ( // Admin Rule
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
-          ) ||
-          ( // User "Like" Rule
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+          (
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likers'])
           )
         );
@@ -78,21 +72,17 @@ service cloud.firestore {
           resource.data.userId == request.auth.uid ||
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
         );
-
-      // ✅ List: only admins can list submissions
-      allow list: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
     // 📁 Redemption Requests Collection
     match /redemptionRequests/{redemptionId} {
-        // ✅ Read, List, Update, Delete: only admins
-        allow read, list, update, delete: if request.auth != null &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-
-        // ✅ Create: user can create their own request
-        allow create: if request.auth != null &&
-            request.resource.data.userId == request.auth.uid;
+      // ✅ Read, List, Update, Delete: ONLY admins
+      allow read, list, update, delete: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+        
+      // ✅ Create: user can create their own redemption request
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
     }
   }
 }
