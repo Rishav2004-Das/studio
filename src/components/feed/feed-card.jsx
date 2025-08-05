@@ -22,7 +22,7 @@ export function FeedCard({ submission }) {
   const { currentUser, isAuthenticated } = useAuth();
   const { toast } = useToast();
   
-  // Optimistic UI state
+  // Optimistic UI state with fallbacks for older data
   const [likeCount, setLikeCount] = useState(submission.likes || 0);
   const [isLiked, setIsLiked] = useState(() => {
     if (!currentUser || !submission.likers) return false;

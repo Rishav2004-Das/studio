@@ -70,6 +70,8 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
       submittedAt: serverTimestamp(),
       status: "Pending", // Submissions are pending admin review
       tokensAwarded: 0,
+      likes: 0,
+      likers: [],
     };
 
     try {
