@@ -48,8 +48,8 @@ service cloud.firestore {
     // 📁 Submissions Collection
     match /submissions/{submissionId} {
 
-      // ✅ Read & List: ANYONE can read/list submissions (for public feed)
-      allow read, list: if true;
+      // ✅ Read/List: Publicly readable for the feed
+      allow get, list: if true;
       
       // ✅ Update: 
       // - Admins can update any field (for review)
@@ -57,9 +57,7 @@ service cloud.firestore {
       allow update: if request.auth != null &&
         (
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
-          (
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likers'])
-          )
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likers'])
         );
 
       // ✅ Create: user can create their own submissions
@@ -72,6 +70,19 @@ service cloud.firestore {
           resource.data.userId == request.auth.uid ||
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
         );
+
+      // 💬 Comments Subcollection
+      match /comments/{commentId} {
+        // ✅ Read: Anyone can read comments
+        allow get, list: if true;
+        
+        // ✅ Create: Authenticated users can create comments
+        allow create: if request.auth != null && 
+          request.resource.data.userId == request.auth.uid;
+
+        // ❌ Update/Delete: Not allowed for now
+        allow update, delete: if false;
+      }
     }
 
     // 📁 Redemption Requests Collection
