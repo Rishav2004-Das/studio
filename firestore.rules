@@ -48,7 +48,7 @@ service cloud.firestore {
     // 📁 Submissions Collection
     match /submissions/{submissionId} {
 
-      // ✅ Read/List: Publicly readable for the feed
+      // ✅ Read, List: Anyone can view submissions for the feed.
       allow get, list: if true;
       
       // ✅ Update: 
@@ -73,15 +73,12 @@ service cloud.firestore {
 
       // 💬 Comments Subcollection
       match /comments/{commentId} {
-        // ✅ Read: Anyone can read comments
-        allow get, list: if true;
-        
-        // ✅ Create: Authenticated users can create comments
-        allow create: if request.auth != null && 
-          request.resource.data.userId == request.auth.uid;
-
-        // ❌ Update/Delete: Not allowed for now
-        allow update, delete: if false;
+          // ✅ Read: Anyone can read comments
+          allow get, list: if true;
+          // ✅ Create: Authenticated users can create comments
+          allow create: if request.auth != null;
+          // ❌ Update/Delete: Comments are immutable
+          allow update, delete: if false;
       }
     }
 
@@ -94,6 +91,19 @@ service cloud.firestore {
       // ✅ Create: user can create their own redemption request
       allow create: if request.auth != null &&
         request.resource.data.userId == request.auth.uid;
+    }
+
+    // 📢 Announcements Collection
+    match /announcements/{announcementId} {
+      // ✅ Read: Anyone can read announcements
+      allow get, list: if true;
+
+      // ✅ Create, Delete: Only admins can create or delete announcements
+      allow create, delete: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+        
+      // ❌ Update: Announcements are immutable for simplicity
+      allow update: if false;
     }
   }
 }
