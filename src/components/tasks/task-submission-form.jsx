@@ -72,6 +72,7 @@ export function TaskSubmissionForm({ taskId, taskTitle, taskTokens }) {
       tokensAwarded: 0,
       likes: 0,
       likers: [],
+      commentCount: 0,
     };
 
     try {
