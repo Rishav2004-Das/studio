@@ -6,11 +6,12 @@ import { db } from '@/lib/firebase/config.js';
 import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { mockTasks } from "@/lib/mock-data.js";
 import { Skeleton } from '@/components/ui/skeleton.jsx';
-import { LayoutGrid, Rss, Megaphone } from 'lucide-react';
+import { LayoutGrid, Rss, Megaphone, Lock } from 'lucide-react';
 import { FeedCard } from '@/components/feed/feed-card.jsx';
 import { AnnouncementCard } from '@/components/feed/announcement-card.jsx';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button.jsx';
+import { useAuth } from '@/contexts/auth-context.jsx';
 
 // Mock announcements - in a real app, this would come from Firestore
 const mockAnnouncements = [
@@ -33,6 +34,7 @@ export default function HomePage() {
   const [feedItems, setFeedItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
     const fetchFeed = async () => {
@@ -51,7 +53,6 @@ export default function HomePage() {
           return {
             id: doc.id,
             ...data,
-            // Ensure submittedAt is a JS Date object for consistent handling
             submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : new Date(data.submittedAt || Date.now())
           }
         });
@@ -64,8 +65,69 @@ export default function HomePage() {
       }
     };
 
-    fetchFeed();
-  }, []);
+    // Only fetch feed if the user is authenticated and auth state is resolved.
+    if (!authLoading && isAuthenticated) {
+        fetchFeed();
+    } else {
+        setIsLoading(false); // If not authenticated, stop loading.
+    }
+
+  }, [isAuthenticated, authLoading]);
+
+  const renderFeedContent = () => {
+    if (authLoading || isLoading) {
+      return (
+        <div className="space-y-6">
+          <Skeleton className="h-64 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+        </div>
+      );
+    }
+    
+    if (!isAuthenticated) {
+        return (
+             <div className="text-center rounded-lg border-2 border-dashed p-12 flex flex-col items-center">
+                <Lock className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-semibold text-muted-foreground">Community Feed is Private</p>
+                <p className="mt-2 text-muted-foreground">
+                    Please log in or sign up to see what the community is up to!
+                </p>
+                 <Button asChild className="mt-4">
+                    <Link href="/profile">Log In / Sign Up</Link>
+                </Button>
+            </div>
+        )
+    }
+
+    if (error) {
+      return (
+        <div className="text-center rounded-lg border-2 border-dashed border-destructive p-8 bg-destructive/10 text-destructive">
+          <p className="font-semibold">An error occurred</p>
+          <p className="text-sm mt-2">{error}</p>
+        </div>
+      );
+    }
+
+    if (feedItems.length === 0) {
+      return (
+        <div className="text-center rounded-lg border-2 border-dashed p-12">
+          <p className="text-lg font-semibold text-muted-foreground">The feed is quiet...</p>
+          <p className="mt-2 text-muted-foreground">
+            No approved submissions yet. Complete a task to be the first!
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {feedItems.map((item) => (
+          <FeedCard key={item.id} submission={item} />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="container mx-auto">
@@ -76,38 +138,7 @@ export default function HomePage() {
             <Rss className="h-8 w-8 text-primary" />
             Community Feed
           </h1>
-
-          {isLoading && (
-             <div className="space-y-6">
-                <Skeleton className="h-64 w-full rounded-lg" />
-                <Skeleton className="h-64 w-full rounded-lg" />
-                <Skeleton className="h-64 w-full rounded-lg" />
-            </div>
-          )}
-
-          {error && (
-            <div className="text-center rounded-lg border-2 border-dashed border-destructive p-8 bg-destructive/10 text-destructive">
-              <p className="font-semibold">An error occurred</p>
-              <p className="text-sm mt-2">{error}</p>
-            </div>
-          )}
-
-          {!isLoading && !error && feedItems.length === 0 && (
-            <div className="text-center rounded-lg border-2 border-dashed p-12">
-              <p className="text-lg font-semibold text-muted-foreground">The feed is quiet...</p>
-              <p className="mt-2 text-muted-foreground">
-                No approved submissions yet. Complete a task to be the first!
-              </p>
-            </div>
-          )}
-
-          {!isLoading && !error && feedItems.length > 0 && (
-            <div className="space-y-6">
-              {feedItems.map((item) => (
-                <FeedCard key={item.id} submission={item} />
-              ))}
-            </div>
-          )}
+          {renderFeedContent()}
         </div>
 
         {/* Sidebar for Announcements and Tasks */}
