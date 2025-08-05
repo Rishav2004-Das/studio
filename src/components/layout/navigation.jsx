@@ -66,22 +66,21 @@ export function Navigation() {
     <SidebarMenu>
       {itemsToDisplay.map((item) => (
         <SidebarMenuItem key={item.title}>
-          <Link href={item.href} legacyBehavior passHref>
-            <SidebarMenuButton
-              asChild={false} 
-              className={cn(
-                "w-full justify-start",
-                getIsActive(item.href)
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "hover:bg-sidebar-accent/80"
-              )}
-              isActive={getIsActive(item.href)}
-              tooltip={{ children: item.title, side: "right", align: "center" }}
-            >
-              <item.icon className="mr-2 h-5 w-5" />
-              <span className="truncate">{item.title}</span>
-            </SidebarMenuButton>
-          </Link>
+          <SidebarMenuButton
+            as={Link}
+            href={item.href}
+            className={cn(
+              "w-full justify-start",
+              getIsActive(item.href)
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "hover:bg-sidebar-accent/80"
+            )}
+            isActive={getIsActive(item.href)}
+            tooltip={{ children: item.title, side: "right", align: "center" }}
+          >
+            <item.icon className="mr-2 h-5 w-5" />
+            <span className="truncate">{item.title}</span>
+          </SidebarMenuButton>
         </SidebarMenuItem>
       ))}
     </SidebarMenu>
