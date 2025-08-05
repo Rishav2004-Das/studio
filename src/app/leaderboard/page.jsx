@@ -12,6 +12,7 @@ import { Trophy, Award, UserCircle2, ServerCrash, Search, Sparkles } from 'lucid
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 const getMedal = (rank) => {
     if (rank === 1) return '🥇';
@@ -28,8 +29,10 @@ export default function LeaderboardPage() {
     // Search state
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearching, setIsSearching] = useState(false);
-    const [searchResult, setSearchResult] = useState(null);
+    const [searchedUser, setSearchedUser] = useState(null); // Will store the full user object if found
     const [searchError, setSearchError] = useState(null);
+    const [searchedUserId, setSearchedUserId] = useState(null);
+
 
     useEffect(() => {
         const fetchTopUsers = async () => {
@@ -68,12 +71,11 @@ export default function LeaderboardPage() {
 
         setIsSearching(true);
         setSearchError(null);
-        setSearchResult(null);
+        setSearchedUser(null);
+        setSearchedUserId(null);
 
         try {
-            // 1. Find the user by name
             const usersCol = collection(db, 'users');
-            // Using case-insensitive search by matching lowercase name
             const userQuery = query(usersCol, where('name', '==', searchTerm.trim()));
             const userSnapshot = await getDocs(userQuery);
 
@@ -82,15 +84,23 @@ export default function LeaderboardPage() {
                 return;
             }
 
-            const userData = userSnapshot.docs[0].data();
+            const userDoc = userSnapshot.docs[0];
+            const userData = userDoc.data();
             const userTokenBalance = userData.tokenBalance;
+            setSearchedUserId(userDoc.id); // Highlight user if already in top 10
 
-            // 2. Count users with a higher score to determine rank
+            // Check if user is already in the topUsers list
+            const userInTopList = topUsers.find(u => u.id === userDoc.id);
+            if (userInTopList) {
+                return; // No need to fetch rank again, just highlight
+            }
+
+            // If not in top list, calculate rank and add them
             const rankQuery = query(usersCol, where('tokenBalance', '>', userTokenBalance));
             const higherRankedSnapshot = await getCountFromServer(rankQuery);
             const rank = higherRankedSnapshot.data().count + 1;
 
-            setSearchResult({ ...userData, rank });
+            setSearchedUser({ id: userDoc.id, rank, ...userData });
 
         } catch (err) {
             console.error("Error searching for user rank:", err);
@@ -133,6 +143,31 @@ export default function LeaderboardPage() {
         </CardContent>
     );
 
+    const renderUserRow = (user) => (
+        <TableRow 
+            key={user.id}
+            className={cn(searchedUserId === user.id && "bg-primary/10 border-l-4 border-l-primary")}
+        >
+            <TableCell className="text-center text-lg font-bold">{getMedal(user.rank)}</TableCell>
+            <TableCell>
+                <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 border-2 border-primary/50">
+                        <AvatarFallback>
+                            {user.name?.split(' ').map(n => n[0]).join('').toUpperCase() || <UserCircle2 />}
+                        </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium text-foreground">{user.name}</span>
+                </div>
+            </TableCell>
+            <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-1.5 font-semibold text-accent">
+                    <Award className="h-5 w-5" />
+                    <span>{user.tokenBalance.toLocaleString()}</span>
+                </div>
+            </TableCell>
+        </TableRow>
+    );
+
     const renderContent = () => {
         if (isLoading) {
             return renderLoadingSkeleton();
@@ -148,17 +183,8 @@ export default function LeaderboardPage() {
             );
         }
         
-        if (topUsers.length === 0) {
-             return (
-                <div className="text-center rounded-lg border-2 border-dashed p-12">
-                    <p className="text-lg font-semibold text-muted-foreground">The leaderboard is empty.</p>
-                    <p className="mt-2 text-muted-foreground">
-                        Complete some tasks to get on the board!
-                    </p>
-                </div>
-            );
-        }
-
+        const isSearchedUserInList = searchedUser && topUsers.some(u => u.id === searchedUser.id);
+        
         return (
             <CardContent className="p-0">
                 <Table>
@@ -170,27 +196,33 @@ export default function LeaderboardPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {topUsers.map(user => (
-                            <TableRow key={user.id}>
-                                <TableCell className="text-center text-lg font-bold">{getMedal(user.rank)}</TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-3">
-                                        <Avatar className="h-10 w-10 border-2 border-primary/50">
-                                            <AvatarFallback>
-                                                {user.name?.split(' ').map(n => n[0]).join('').toUpperCase() || <UserCircle2 />}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <span className="font-medium text-foreground">{user.name}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-1.5 font-semibold text-accent">
-                                        <Award className="h-5 w-5" />
-                                        <span>{user.tokenBalance.toLocaleString()}</span>
+                        {topUsers.length === 0 && !searchedUser && (
+                            <TableRow>
+                                <TableCell colSpan={3}>
+                                    <div className="text-center rounded-lg p-12">
+                                        <p className="text-lg font-semibold text-muted-foreground">The leaderboard is empty.</p>
+                                        <p className="mt-2 text-muted-foreground">
+                                            Complete some tasks to get on the board!
+                                        </p>
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        )}
+                        {topUsers.map(user => renderUserRow(user))}
+                        {searchedUser && !isSearchedUserInList && (
+                             <>
+                                <TableRow>
+                                    <TableCell colSpan={3} className="p-0">
+                                        <div className="flex items-center gap-2 p-2 text-xs text-muted-foreground">
+                                            <Separator className="flex-1" />
+                                            <span>...</span>
+                                            <Separator className="flex-1" />
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                                {renderUserRow(searchedUser)}
+                            </>
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>
@@ -225,34 +257,6 @@ export default function LeaderboardPage() {
                     {searchError && (
                         <p className="mt-4 text-sm text-destructive text-center">{searchError}</p>
                     )}
-                    {searchResult && (
-                        <div className="mt-6 p-4 bg-accent/10 rounded-lg border border-accent/20">
-                             <h3 className="text-lg font-semibold text-center text-accent-foreground mb-4">Your Position</h3>
-                             <Table>
-                                 <TableBody>
-                                     <TableRow className="border-0 hover:bg-transparent">
-                                         <TableCell className="text-center text-xl font-bold w-[80px]">
-                                             {getMedal(searchResult.rank)}
-                                         </TableCell>
-                                         <TableCell>
-                                             <div className="flex items-center gap-3">
-                                                <Avatar className="h-10 w-10 border-2 border-primary/50">
-                                                    <AvatarFallback>{searchResult.name?.split(' ').map(n => n[0]).join('').toUpperCase() || <UserCircle2 />}</AvatarFallback>
-                                                </Avatar>
-                                                <span className="font-medium text-foreground">{searchResult.name}</span>
-                                             </div>
-                                         </TableCell>
-                                         <TableCell className="text-right">
-                                             <div className="flex items-center justify-end gap-1.5 font-semibold text-accent">
-                                                <Award className="h-5 w-5" />
-                                                <span>{searchResult.tokenBalance.toLocaleString()}</span>
-                                             </div>
-                                         </TableCell>
-                                     </TableRow>
-                                 </TableBody>
-                             </Table>
-                        </div>
-                    )}
                 </CardContent>
             </Card>
 
@@ -271,3 +275,5 @@ export default function LeaderboardPage() {
         </div>
     );
 }
+
+    
