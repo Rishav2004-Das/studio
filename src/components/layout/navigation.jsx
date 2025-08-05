@@ -9,7 +9,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar.jsx";
-import { LayoutGrid, UserCircle2, Settings, ShieldCheck, Home } from "lucide-react"; 
+import { LayoutGrid, UserCircle2, Settings, ShieldCheck, Home, Trophy } from "lucide-react"; 
 import { useAuth } from "@/contexts/auth-context.jsx";
 
 const navItems = [
@@ -22,6 +22,11 @@ const navItems = [
     title: "All Tasks",
     href: "/tasks",
     icon: LayoutGrid,
+  },
+  {
+    title: "Leaderboard",
+    href: "/leaderboard",
+    icon: Trophy,
   },
   {
     title: "My Profile",
