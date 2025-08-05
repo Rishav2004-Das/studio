@@ -3,98 +3,51 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // 📁 Users Collection
-    match /users/{userIdInPath} {
-
-      // ✅ Read & List: Allow public read/list for leaderboards.
-      // Anyone can see user profiles, but sensitive data shouldn't be stored here.
-      allow get, list: if true;
-
-      // ✅ Update:
-      // - User can update their own document (except isAdmin)
-      // - Admins can only update tokenBalance field
-      allow update: if request.auth != null &&
-        (
-          (
-            request.auth.uid == userIdInPath &&
-            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin'])
-          ) ||
-          (
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tokenBalance'])
-          )
-        );
-
-      // ✅ Create: user can create their own doc (isAdmin must not be true)
-      allow create: if request.auth != null &&
-        request.auth.uid == userIdInPath &&
-        (
-          request.resource.data.isAdmin == null ||
-          request.resource.data.isAdmin == false
-        );
-
-      // ✅ Delete: only the user can delete their own document
-      allow delete: if request.auth != null &&
-        request.auth.uid == userIdInPath;
+    
+    match /users/{userId} {
+      // Allow reading individual user profiles (needed for profile pages if they become public)
+      allow read: if true; 
+      // Allow creating users (signup)
+      allow create: if request.auth != null; 
+      // Allow users to update/delete their own document
+      allow update, delete: if request.auth.uid == userId; 
     }
 
-    // 📁 Submissions Collection
+    // Allow querying the users collection for the leaderboard and search functionality
+    match /users/{userId=**} {
+       allow list: if true;
+    }
+    
+    // Submissions can be created by authenticated users
+    // Submissions can be read by anyone (for the public feed)
+    // Submissions can only be updated/deleted by an admin
     match /submissions/{submissionId} {
+      allow read, list: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
 
-      // ✅ Read & List: Allow public read/list for the main feed
-      allow get, list: if true;
-      
-      // ✅ Update: 
-      // - Admins can update any field (for review)
-      // - Any authenticated user can update ONLY the 'likes' and 'likers' fields
-      allow update: if request.auth != null &&
-        (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likers'])
-        );
-
-      // ✅ Create: user can create their own submissions
-      allow create: if request.auth != null &&
-        request.resource.data.userId == request.auth.uid;
-
-      // ✅ Delete: owner OR admin can delete
-      allow delete: if request.auth != null &&
-        (
-          resource.data.userId == request.auth.uid ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
-        );
-
-      // 💬 Comments Subcollection
+      // Rules for the 'comments' subcollection
       match /comments/{commentId} {
-        // ✅ Read: Anyone can read comments
-        allow get, list: if true;
-        // ✅ Create: Any authenticated user can create a comment
+        allow read, list: if true;
         allow create: if request.auth != null;
-        // ❌ Update, Delete: Not allowed for now
-        allow update, delete: if false;
+        // Comments shouldn't be updatable/deletable by users for now to keep it simple
       }
     }
-
-    // 📁 Redemption Requests Collection
-    match /redemptionRequests/{redemptionId} {
-      // ✅ Read, List, Update, Delete: ONLY admins
-      allow read, list, update, delete: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-        
-      // ✅ Create: user can create their own redemption request
-      allow create: if request.auth != null &&
-        request.resource.data.userId == request.auth.uid;
-    }
-
-    // 📁 Announcements Collection
+    
+    // Announcements can be read by anyone
+    // Announcements can only be created/deleted by an admin
     match /announcements/{announcementId} {
-      // ✅ Read: Anyone can read announcements
-      allow get, list: if true;
-
-      // ✅ Create, Update, Delete: ONLY admins
-      allow create, update, delete: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow read: if true;
+      allow list: if true;
+      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
+    
+    match /redemptionRequests/{requestId} {
+      // Users can create their own requests
+      allow create: if request.auth.uid == request.resource.data.userId;
+      // Admins can read/update/delete all requests
+      allow read, list, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
   }
 }
