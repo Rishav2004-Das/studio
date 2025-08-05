@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -6,12 +7,9 @@ service cloud.firestore {
     // 📁 Users Collection
     match /users/{userIdInPath} {
 
-      // ✅ Read: user can read their own data OR if requester is admin
-      allow read: if request.auth != null &&
-        (
-          request.auth.uid == userIdInPath ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
-        );
+      // ✅ Read & List: Allow public read/list for leaderboards.
+      // Anyone can see user profiles, but sensitive data shouldn't be stored here.
+      allow get, list: if true;
 
       // ✅ Update:
       // - User can update their own document (except isAdmin)
@@ -36,10 +34,6 @@ service cloud.firestore {
           request.resource.data.isAdmin == false
         );
 
-      // ✅ List: only admins can list users
-      allow list: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-
       // ✅ Delete: only the user can delete their own document
       allow delete: if request.auth != null &&
         request.auth.uid == userIdInPath;
@@ -48,7 +42,7 @@ service cloud.firestore {
     // 📁 Submissions Collection
     match /submissions/{submissionId} {
 
-      // ✅ Read, List: Anyone can view submissions for the feed.
+      // ✅ Read & List: Allow public read/list for the main feed
       allow get, list: if true;
       
       // ✅ Update: 
@@ -73,12 +67,12 @@ service cloud.firestore {
 
       // 💬 Comments Subcollection
       match /comments/{commentId} {
-          // ✅ Read: Anyone can read comments
-          allow get, list: if true;
-          // ✅ Create: Authenticated users can create comments
-          allow create: if request.auth != null;
-          // ❌ Update/Delete: Comments are immutable
-          allow update, delete: if false;
+        // ✅ Read: Anyone can read comments
+        allow get, list: if true;
+        // ✅ Create: Any authenticated user can create a comment
+        allow create: if request.auth != null;
+        // ❌ Update, Delete: Not allowed for now
+        allow update, delete: if false;
       }
     }
 
@@ -93,17 +87,14 @@ service cloud.firestore {
         request.resource.data.userId == request.auth.uid;
     }
 
-    // 📢 Announcements Collection
+    // 📁 Announcements Collection
     match /announcements/{announcementId} {
       // ✅ Read: Anyone can read announcements
       allow get, list: if true;
 
-      // ✅ Create, Delete: Only admins can create or delete announcements
-      allow create, delete: if request.auth != null &&
+      // ✅ Create, Update, Delete: ONLY admins
+      allow create, update, delete: if request.auth != null &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-        
-      // ❌ Update: Announcements are immutable for simplicity
-      allow update: if false;
     }
   }
 }
